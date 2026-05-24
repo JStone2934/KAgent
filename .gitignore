@@ -1,0 +1,6 @@
+.kagent/
+extension/node_modules/
+extension/out/
+extension/dist/
+*.vsix
+.DS_Store

@@ -1,0 +1,73 @@
+{
+  "name": "kagent",
+  "displayName": "KAgent",
+  "description": "将 Agent 文件修改以股票 K 线图展示（一文件一股）",
+  "version": "0.1.2",
+  "publisher": "kagent",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Other", "Visualization"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "kagent.openChart",
+        "title": "KAgent: 打开行情图"
+      },
+      {
+        "command": "kagent.installHooks",
+        "title": "KAgent: 安装项目 Hooks"
+      },
+      {
+        "command": "kagent.refresh",
+        "title": "KAgent: 刷新行情",
+        "icon": "$(refresh)"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "kagent",
+          "title": "KAgent",
+          "icon": "$(graph-line)"
+        }
+      ]
+    },
+    "views": {
+      "kagent": [
+        {
+          "type": "webview",
+          "id": "kagent.marketView",
+          "name": "全仓库行情"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "kagent.refresh",
+          "when": "view == kagent.marketView",
+          "group": "navigation"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "postinstall": "cp node_modules/lightweight-charts/dist/lightweight-charts.standalone.production.js media/lightweight-charts.js",
+    "package": "vsce package --no-dependencies"
+  },
+  "dependencies": {
+    "lightweight-charts": "^4.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^2.22.0",
+    "typescript": "^5.3.3"
+  }
+}
