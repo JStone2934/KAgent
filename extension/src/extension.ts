@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { isColorSchemeConfigChange } from "./colorScheme";
+import { isMarketColorConfigChange } from "./colorScheme";
 import { MarketViewProvider } from "./marketViewProvider";
 import { installProjectHooks, hooksConfigured } from "./hookInstaller";
 
@@ -38,7 +38,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration((e) => {
-      if (isColorSchemeConfigChange(e)) {
+      if (isMarketColorConfigChange(e)) {
         void marketProvider?.refresh();
       }
     })

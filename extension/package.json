@@ -64,7 +64,17 @@
             "绿涨红跌（美股）"
           ],
           "default": "cn",
-          "description": "行情图与列表的涨跌配色方案"
+          "description": "行情图与列表的涨跌配色方案（A股/美股）"
+        },
+        "kagent.colorTone": {
+          "type": "string",
+          "enum": ["light", "dark"],
+          "enumDescriptions": [
+            "亮色涨跌色号",
+            "暗色涨跌色号（适合深色背景）"
+          ],
+          "default": "light",
+          "description": "涨跌颜色的明暗风格，与 colorScheme 组合使用"
         }
       }
     }

@@ -30,6 +30,9 @@ export interface SymbolsFile {
   symbols: Record<string, SymbolInfo>;
 }
 
+/** 同一轮编辑拆分后的阶段：先删后增 */
+export type CandleLeg = "drop" | "rise";
+
 export interface Candle {
   time: number;
   open: number;
@@ -39,6 +42,9 @@ export interface Candle {
   volume: number;
   edit_index: number;
   is_ipo?: boolean;
+  /** 同轮编辑内的子 K 线序号（1=先删，2=后增） */
+  sub_step?: number;
+  leg?: CandleLeg;
 }
 
 /** 最近一次编辑相对上一状态的涨跌（与 K 线阴阳一致：收≥开为涨） */

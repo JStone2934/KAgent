@@ -1,17 +1,43 @@
-/* 涨/跌色号：填充、边框、影线、箭头共用（由 data-color-scheme 切换） */
+/* K 线/成交量：--kagent-up/down（随明暗变化）；列表箭头：--kagent-arrow-*（始终亮色） */
 :root,
-[data-color-scheme="cn"] {
+[data-color-scheme="cn"][data-color-tone="light"],
+[data-color-scheme="cn"]:not([data-color-tone]) {
   --kagent-up: #e53935;
   --kagent-down: #43a047;
   --kagent-up-rgb: 229, 57, 53;
   --kagent-down-rgb: 67, 160, 71;
 }
 
-[data-color-scheme="us"] {
+[data-color-scheme="cn"] {
+  --kagent-arrow-up: #e53935;
+  --kagent-arrow-down: #43a047;
+}
+
+[data-color-scheme="us"][data-color-tone="light"],
+[data-color-scheme="us"]:not([data-color-tone]) {
   --kagent-up: #43a047;
   --kagent-down: #e53935;
   --kagent-up-rgb: 67, 160, 71;
   --kagent-down-rgb: 229, 57, 53;
+}
+
+[data-color-scheme="us"] {
+  --kagent-arrow-up: #43a047;
+  --kagent-arrow-down: #e53935;
+}
+
+[data-color-scheme="cn"][data-color-tone="dark"] {
+  --kagent-up: #a32e2e;
+  --kagent-down: #2f7040;
+  --kagent-up-rgb: 163, 46, 46;
+  --kagent-down-rgb: 47, 112, 64;
+}
+
+[data-color-scheme="us"][data-color-tone="dark"] {
+  --kagent-up: #2f7040;
+  --kagent-down: #a32e2e;
+  --kagent-up-rgb: 47, 112, 64;
+  --kagent-down-rgb: 163, 46, 46;
 }
 
 * {
@@ -111,11 +137,11 @@ body {
 }
 
 .trend-arrow.trend-up {
-  color: var(--kagent-up);
+  color: var(--kagent-arrow-up, var(--kagent-up));
 }
 
 .trend-arrow.trend-down {
-  color: var(--kagent-down);
+  color: var(--kagent-arrow-down, var(--kagent-down));
 }
 
 .trend-arrow.trend-flat,
@@ -177,6 +203,13 @@ body {
   justify-content: space-between;
   gap: 8px;
   padding: 8px 12px 0;
+}
+
+.chart-toolbar {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
 }
 
 .chart-title {

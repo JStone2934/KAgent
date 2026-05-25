@@ -3,8 +3,11 @@ import * as path from "path";
 import * as vscode from "vscode";
 import {
   ColorScheme,
+  ColorTone,
   getColorScheme,
+  getColorTone,
   setColorScheme,
+  setColorTone,
 } from "./colorScheme";
 import { buildMarketPayload } from "./candleBuilder";
 import { readAllEvents, readSymbols } from "./eventStore";
@@ -49,6 +52,10 @@ export class MarketViewProvider implements vscode.WebviewViewProvider {
       if (msg.type === "setColorScheme") {
         const scheme: ColorScheme = msg.scheme === "us" ? "us" : "cn";
         void setColorScheme(scheme).then(() => this.pushUpdate());
+      }
+      if (msg.type === "setColorTone") {
+        const tone: ColorTone = msg.tone === "dark" ? "dark" : "light";
+        void setColorTone(tone).then(() => this.pushUpdate());
       }
     });
 
@@ -129,6 +136,7 @@ export class MarketViewProvider implements vscode.WebviewViewProvider {
       hooksOk: boolean;
       kagentDir: string | null;
       colorScheme: ColorScheme;
+      colorTone: ColorTone;
     }
   > {
     const kagentDir = getKagentDir();
@@ -142,6 +150,7 @@ export class MarketViewProvider implements vscode.WebviewViewProvider {
         hooksOk: false,
         kagentDir: null,
         colorScheme: getColorScheme(),
+        colorTone: getColorTone(),
       };
     }
 
@@ -157,7 +166,13 @@ export class MarketViewProvider implements vscode.WebviewViewProvider {
       ? fs.existsSync(path.join(workspaceRoot, ".cursor", "hooks.json"))
       : false;
 
-    return { ...market, hooksOk, kagentDir, colorScheme: getColorScheme() };
+    return {
+      ...market,
+      hooksOk,
+      kagentDir,
+      colorScheme: getColorScheme(),
+      colorTone: getColorTone(),
+    };
   }
 
   private getHtml(webview: vscode.Webview): string {
@@ -180,7 +195,7 @@ export class MarketViewProvider implements vscode.WebviewViewProvider {
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="${styleUri}" />
 </head>
-<body data-color-scheme="cn">
+<body data-color-scheme="cn" data-color-tone="light">
   <div id="banner" class="banner hidden"></div>
   <div class="layout">
     <aside class="sidebar">
@@ -194,12 +209,18 @@ export class MarketViewProvider implements vscode.WebviewViewProvider {
     <main class="chart-panel">
       <div class="chart-header">
         <div id="chart-title" class="chart-title">选择一只股票</div>
-        <div class="scheme-switch" role="group" aria-label="配色方案">
-          <button type="button" class="scheme-btn" data-scheme="cn" title="红涨绿跌">A股</button>
-          <button type="button" class="scheme-btn" data-scheme="us" title="绿涨红跌">美股</button>
+        <div class="chart-toolbar">
+          <div class="scheme-switch" role="group" aria-label="市场配色">
+            <button type="button" class="scheme-btn" data-scheme="cn" title="红涨绿跌">A股</button>
+            <button type="button" class="scheme-btn" data-scheme="us" title="绿涨红跌">美股</button>
+          </div>
+          <div class="scheme-switch tone-switch" role="group" aria-label="明暗色调">
+            <button type="button" class="scheme-btn" data-tone="light" title="亮色色号">亮</button>
+            <button type="button" class="scheme-btn" data-tone="dark" title="暗色色号">暗</button>
+          </div>
         </div>
       </div>
-      <div id="chart-legend" class="chart-legend muted">开/收=改前/改后行数，高/低=该轮最大/最小行数</div>
+      <div id="chart-legend" class="chart-legend muted">开/收=阶段起止行数；同轮先删后增拆为两根K线</div>
       <div id="ohlc-bar" class="ohlc-bar">
         <span class="ohlc-item"><em>轮次</em><strong id="ohlc-round">—</strong></span>
         <span class="ohlc-item"><em>开</em><strong id="ohlc-open">—</strong></span>

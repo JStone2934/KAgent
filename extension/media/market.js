@@ -10,11 +10,12 @@
     const down = root.getPropertyValue("--kagent-down").trim();
     const upRgb = root.getPropertyValue("--kagent-up-rgb").trim();
     const downRgb = root.getPropertyValue("--kagent-down-rgb").trim();
+    const volAlpha = colorTone === "dark" ? 0.6 : 0.45;
     return {
       up,
       down,
-      upVol: `rgba(${upRgb}, 0.45)`,
-      downVol: `rgba(${downRgb}, 0.45)`,
+      upVol: `rgba(${upRgb}, ${volAlpha})`,
+      downVol: `rgba(${downRgb}, ${volAlpha})`,
     };
   }
 
@@ -38,7 +39,9 @@
   let lastCandles = [];
   let lastSelectedFile = null;
   let colorScheme = "cn";
+  let colorTone = "light";
   let schemeSwitchBound = false;
+  let toneSwitchBound = false;
 
   const SCHEME_LEGEND = { cn: "红涨绿跌", us: "绿涨红跌" };
 
@@ -49,7 +52,10 @@
     emptyHint: document.getElementById("empty-hint"),
     chartTitle: document.getElementById("chart-title"),
     chartLegend: document.getElementById("chart-legend"),
-    schemeSwitch: document.querySelector(".scheme-switch"),
+    schemeSwitch: document.querySelector(
+      '.scheme-switch:not(.tone-switch)'
+    ),
+    toneSwitch: document.querySelector(".tone-switch"),
     chartContainer: document.getElementById("chart-container"),
     chartError: document.getElementById("chart-error"),
     ohlcRound: document.getElementById("ohlc-round"),
@@ -64,17 +70,27 @@
     return (n > 0 ? "+" : "") + n;
   }
 
-  function applyColorScheme(scheme) {
+  function legendText() {
+    const market = SCHEME_LEGEND[colorScheme];
+    const tone = colorTone === "dark" ? " · 暗色" : "";
+    return "开/收=阶段起止行数；同轮先删后增拆为两根K线 · " + market + tone;
+  }
+
+  function applyMarketColors(scheme, tone) {
     colorScheme = scheme === "us" ? "us" : "cn";
+    colorTone = tone === "dark" ? "dark" : "light";
     document.documentElement.dataset.colorScheme = colorScheme;
+    document.documentElement.dataset.colorTone = colorTone;
     document.body.dataset.colorScheme = colorScheme;
+    document.body.dataset.colorTone = colorTone;
     els.schemeSwitch?.querySelectorAll(".scheme-btn").forEach((btn) => {
       btn.classList.toggle("active", btn.dataset.scheme === colorScheme);
     });
+    els.toneSwitch?.querySelectorAll(".scheme-btn").forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.tone === colorTone);
+    });
     if (els.chartLegend) {
-      els.chartLegend.textContent =
-        "开/收=改前/改后行数，高/低=该轮最大/最小行数 · " +
-        SCHEME_LEGEND[colorScheme];
+      els.chartLegend.textContent = legendText();
     }
     if (candleSeries && lastCandles.length && lastSelectedFile) {
       renderChart(lastSelectedFile, lastCandles);
@@ -95,6 +111,22 @@
           return;
         }
         vscode.postMessage({ type: "setColorScheme", scheme: next });
+      });
+    });
+  }
+
+  function bindToneSwitch() {
+    if (toneSwitchBound || !els.toneSwitch) {
+      return;
+    }
+    toneSwitchBound = true;
+    els.toneSwitch.querySelectorAll(".scheme-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const next = btn.dataset.tone === "dark" ? "dark" : "light";
+        if (next === colorTone) {
+          return;
+        }
+        vscode.postMessage({ type: "setColorTone", tone: next });
       });
     });
   }
@@ -130,9 +162,10 @@
 
     candles.forEach((c, i) => {
       const idx = c.edit_index ?? i + 1;
-      let time = BASE_TIME + idx * 3600;
+      const sub = c.sub_step ?? 0;
+      let time = BASE_TIME + idx * 3600 + sub * 900;
       if (time <= lastTime) {
-        time = lastTime + 3600;
+        time = lastTime + 900;
       }
       lastTime = time;
 
@@ -148,6 +181,7 @@
         edit_index: idx,
         volume: c.volume,
         is_ipo: c.is_ipo,
+        leg: c.leg,
         raw: c,
       });
     });
@@ -181,8 +215,12 @@
       return;
     }
     const c = meta.raw;
+    const legLabel =
+      meta.leg === "drop" ? " 删" : meta.leg === "rise" ? " 增" : "";
     els.ohlcRound.textContent =
-      String(meta.edit_index) + (meta.is_ipo ? " 上市" : "");
+      String(meta.edit_index) +
+      legLabel +
+      (meta.is_ipo ? " 上市" : "");
     els.ohlcOpen.textContent = String(c.open);
     els.ohlcHigh.textContent = String(c.high);
     els.ohlcLow.textContent = String(c.low);
@@ -387,10 +425,9 @@
     }
     const payload = event.data.payload;
     lastSelectedFile = payload.selectedFile ?? null;
-    if (payload.colorScheme) {
-      applyColorScheme(payload.colorScheme);
-    }
+    applyMarketColors(payload.colorScheme, payload.colorTone);
     bindSchemeSwitch();
+    bindToneSwitch();
     updateBanner(payload);
     renderSymbols(payload.symbols, payload.selectedFile);
     requestAnimationFrame(() => {
@@ -399,6 +436,10 @@
   });
 
   bindSchemeSwitch();
-  applyColorScheme(document.body.dataset.colorScheme || "cn");
+  bindToneSwitch();
+  applyMarketColors(
+    document.body.dataset.colorScheme || "cn",
+    document.body.dataset.colorTone || "light"
+  );
   vscode.postMessage({ type: "ready" });
 })();
