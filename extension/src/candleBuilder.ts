@@ -7,7 +7,8 @@ import {
   SymbolsFile,
 } from "./types";
 
-const NEW_IPO_WINDOW_MS = 60_000;
+/** 列表「新」「改」标记的有效时间（毫秒） */
+const ACTIVITY_WINDOW_MS = 60_000;
 
 function clampHighLow(
   open: number,
@@ -151,10 +152,13 @@ export function buildMarketPayload(
         last_ts: info?.last_ts ?? ipo_ts,
         total_net: netByFile.get(file) ?? 0,
         last_trend: lastEditTrendForFile(events, file),
-        is_new: now - ipo_ts < NEW_IPO_WINDOW_MS,
+        is_new: now - ipo_ts < ACTIVITY_WINDOW_MS,
+        is_recent:
+          now - (info?.last_ts ?? ipo_ts) < ACTIVITY_WINDOW_MS &&
+          now - ipo_ts >= ACTIVITY_WINDOW_MS,
       };
     })
-    .sort((a, b) => b.ipo_ts - a.ipo_ts);
+    .sort((a, b) => b.last_ts - a.last_ts);
 
   const active =
     selectedFile && files.has(selectedFile)

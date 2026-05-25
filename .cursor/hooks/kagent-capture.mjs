@@ -39,26 +39,83 @@ function appendNdjson(filePath, obj) {
 
 function countLines(text) {
   if (!text) return 0;
+  return toLineArray(text).length;
+}
+
+/** 与 countLines 一致的行数组（不含末尾空行） */
+function toLineArray(text) {
+  if (!text) return [];
   const parts = text.split("\n");
   if (parts.length > 0 && parts[parts.length - 1] === "") {
     parts.pop();
   }
-  return parts.length;
+  return parts;
+}
+
+/**
+ * 行数相同但内容不同时，统计被改写的行数。
+ * 用于 K 线波动：同时计入删与增（净行数不变，同轮可拆为先跌后涨）。
+ */
+function countSemanticChangedLines(oldText, newText) {
+  const oldStr = oldText ?? "";
+  const newStr = newText ?? "";
+  if (oldStr === newStr) return 0;
+
+  const oldLines = toLineArray(oldStr);
+  const newLines = toLineArray(newStr);
+  if (oldLines.length !== newLines.length) return 0;
+
+  if (oldLines.length === 0) {
+    return 1;
+  }
+
+  let changed = 0;
+  for (let i = 0; i < oldLines.length; i++) {
+    if (oldLines[i] !== newLines[i]) {
+      changed++;
+    }
+  }
+  return changed;
+}
+
+function statsForEdit(edit) {
+  const oldText = edit.old_string ?? "";
+  const newText = edit.new_string ?? "";
+  const oldLen = countLines(oldText);
+  const newLen = countLines(newText);
+
+  if (newLen > oldLen) {
+    return { added: newLen - oldLen, removed: 0 };
+  }
+  if (newLen < oldLen) {
+    return { added: 0, removed: oldLen - newLen };
+  }
+
+  const churn = countSemanticChangedLines(oldText, newText);
+  return { added: churn, removed: churn };
 }
 
 function computeEditStats(edits) {
   let added = 0;
   let removed = 0;
   for (const edit of edits ?? []) {
-    const oldLen = countLines(edit.old_string ?? "");
-    const newLen = countLines(edit.new_string ?? "");
-    if (newLen > oldLen) {
-      added += newLen - oldLen;
-    } else {
-      removed += oldLen - newLen;
-    }
+    const s = statsForEdit(edit);
+    added += s.added;
+    removed += s.removed;
   }
   return { added, removed, net: added - removed };
+}
+
+/** 用磁盘行数差补齐 edits 未反映的净增删（兜底） */
+function reconcileStatsWithFile(stats, linesBefore, linesAfter) {
+  const fileDelta = linesAfter - linesBefore;
+  if (stats.added === 0 && stats.removed === 0 && fileDelta !== 0) {
+    if (fileDelta > 0) {
+      return { added: fileDelta, removed: 0, net: fileDelta };
+    }
+    return { added: 0, removed: -fileDelta, net: fileDelta };
+  }
+  return stats;
 }
 
 /** 模拟一轮内多次 patch 时行数轨迹，得到该轮最高/最低行数 */
@@ -67,12 +124,26 @@ function simulateRoundExtremes(linesBefore, edits) {
   let high = current;
   let low = current;
   for (const edit of edits ?? []) {
-    const oldLen = countLines(edit.old_string ?? "");
-    const newLen = countLines(edit.new_string ?? "");
+    const oldText = edit.old_string ?? "";
+    const newText = edit.new_string ?? "";
+    const oldLen = countLines(oldText);
+    const newLen = countLines(newText);
     const delta = newLen - oldLen;
-    current = Math.max(0, current + delta);
-    high = Math.max(high, current);
-    low = Math.min(low, current);
+
+    if (delta !== 0) {
+      current = Math.max(0, current + delta);
+      high = Math.max(high, current);
+      low = Math.min(low, current);
+      continue;
+    }
+
+    const churn = countSemanticChangedLines(oldText, newText);
+    if (churn > 0) {
+      const afterDrop = Math.max(0, current - churn);
+      low = Math.min(low, afterDrop);
+      current = afterDrop + churn;
+      high = Math.max(high, current);
+    }
   }
   return { high, low };
 }
@@ -151,7 +222,6 @@ function main() {
       }
 
       const edits = payload.edits ?? [];
-      const stats = computeEditStats(edits);
       const linesAfter = countFileLines(filePath);
 
       const symbolsPath = path.join(kagentDir, "symbols.json");
@@ -162,11 +232,19 @@ function main() {
       let linesBefore;
       if (existing && typeof existing.last_lines === "number") {
         linesBefore = existing.last_lines;
-      } else if (stats.net !== 0) {
-        linesBefore = Math.max(0, linesAfter - stats.net);
       } else {
-        linesBefore = linesAfter;
+        const preStats = computeEditStats(edits);
+        linesBefore =
+          preStats.net !== 0
+            ? Math.max(0, linesAfter - preStats.net)
+            : linesAfter;
       }
+
+      const stats = reconcileStatsWithFile(
+        computeEditStats(edits),
+        linesBefore,
+        linesAfter
+      );
 
       const editCount = (existing?.edit_count ?? 0) + 1;
       const ts = Date.now();

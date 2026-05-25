@@ -20,7 +20,12 @@
 ## 蜡烛图测试段
 
 保留这三行。
-中间行将被替换。
+中间行已替换（语义波动 Hook 验证）。
 末尾行保留。
 
 替换演示结束。
+
+### Hook 语义波动验证
+
+- 改「中间行」那句（行数不变、只改字）→ 应出现 `added=1, removed=1` 与同轮两根 K（先跌后涨）。
+- 本地复测：`node scripts/verify-semantic-hook.mjs demo/watch-me.md`

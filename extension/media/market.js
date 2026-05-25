@@ -374,13 +374,16 @@
       }
       if (s.is_new) {
         li.classList.add("ipo");
+      } else if (s.is_recent) {
+        li.classList.add("recent-edit");
       }
       li.innerHTML =
         trendArrowMarkup(s.last_trend) +
         '<div class="symbol-body">' +
         '<div class="symbol-name">' +
         escapeHtml(shortName(s.file)) +
-        (s.is_new ? '<span class="badge-new">新</span>' : "") +
+        (s.is_new ? '<span class="badge-activity badge-new">新</span>' : "") +
+        (s.is_recent ? '<span class="badge-activity badge-recent">改</span>' : "") +
         "</div><div class=\"symbol-meta\">" +
         s.edit_count +
         " 笔 · " +

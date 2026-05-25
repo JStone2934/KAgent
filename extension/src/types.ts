@@ -59,7 +59,10 @@ export interface SymbolSummary {
   total_net: number;
   /** 上次修改涨势，无事件时为 null */
   last_trend: LastEditTrend | null;
+  /** 上市不久（与 ipo_ts 间隔在窗口内） */
   is_new?: boolean;
+  /** 刚刚发生过编辑（与 last_ts 间隔在窗口内，且非 is_new） */
+  is_recent?: boolean;
 }
 
 export interface MarketPayload {

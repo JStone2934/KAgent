@@ -159,7 +159,8 @@ body {
   color: var(--vscode-list-activeSelectionForeground);
 }
 
-.symbol-list li.ipo {
+.symbol-list li.ipo,
+.symbol-list li.recent-edit {
   border-left-color: var(--kagent-up);
 }
 
@@ -173,13 +174,14 @@ body {
   opacity: 0.85;
 }
 
-.badge-new {
+.badge-activity {
   font-size: 9px;
   padding: 0 4px;
   margin-left: 4px;
   background: var(--kagent-up);
   color: #fff;
   border-radius: 2px;
+  vertical-align: 1px;
 }
 
 .empty-hint {
