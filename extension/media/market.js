@@ -3,6 +3,34 @@
 
   const BASE_TIME = 1704067200;
 
+  /** 从 CSS 变量读取，保证 K 线填充/边框/影线与侧栏箭头色号一致 */
+  function getKagentColors() {
+    const root = getComputedStyle(document.documentElement);
+    const up = root.getPropertyValue("--kagent-up").trim();
+    const down = root.getPropertyValue("--kagent-down").trim();
+    const upRgb = root.getPropertyValue("--kagent-up-rgb").trim();
+    const downRgb = root.getPropertyValue("--kagent-down-rgb").trim();
+    return {
+      up,
+      down,
+      upVol: `rgba(${upRgb}, 0.45)`,
+      downVol: `rgba(${downRgb}, 0.45)`,
+    };
+  }
+
+  function candlestickSeriesOptions(colors) {
+    return {
+      upColor: colors.up,
+      downColor: colors.down,
+      borderVisible: true,
+      borderUpColor: colors.up,
+      borderDownColor: colors.down,
+      wickVisible: true,
+      wickUpColor: colors.up,
+      wickDownColor: colors.down,
+    };
+  }
+
   let chart = null;
   let candleSeries = null;
   let volumeSeries = null;
@@ -85,6 +113,19 @@
     return series;
   }
 
+  function setCloseTrendClass(open, close) {
+    const item = els.ohlcClose?.closest(".ohlc-item");
+    if (!item) {
+      return;
+    }
+    item.classList.remove("ohlc-up", "ohlc-down");
+    if (close > open) {
+      item.classList.add("ohlc-up");
+    } else if (close < open) {
+      item.classList.add("ohlc-down");
+    }
+  }
+
   function updateOhlcBar(meta) {
     if (!meta) {
       ["ohlcRound", "ohlcOpen", "ohlcHigh", "ohlcLow", "ohlcClose", "ohlcVolume"].forEach(
@@ -94,6 +135,7 @@
           }
         }
       );
+      setCloseTrendClass(0, 0);
       return;
     }
     const c = meta.raw;
@@ -104,6 +146,7 @@
     els.ohlcLow.textContent = String(c.low);
     els.ohlcClose.textContent = String(c.close);
     els.ohlcVolume.textContent = String(meta.volume);
+    setCloseTrendClass(c.open, c.close);
   }
 
   function resizeChart() {
@@ -153,13 +196,8 @@
       timeScale: { borderVisible: false },
     });
 
-    candleSeries = chart.addCandlestickSeries({
-      upColor: "#26a69a",
-      downColor: "#ef5350",
-      borderVisible: true,
-      wickUpColor: "#26a69a",
-      wickDownColor: "#ef5350",
-    });
+    const colors = getKagentColors();
+    candleSeries = chart.addCandlestickSeries(candlestickSeriesOptions(colors));
 
     volumeSeries = chart.addHistogramSeries({
       priceFormat: { type: "volume" },
@@ -207,6 +245,9 @@
       return;
     }
 
+    const colors = getKagentColors();
+    candleSeries.applyOptions(candlestickSeriesOptions(colors));
+
     const series = buildSeries(lastCandles);
     const vol = series.map((bar, i) => {
       const c = lastCandles[i];
@@ -214,7 +255,7 @@
       return {
         time: bar.time,
         value: c.volume ?? 0,
-        color: up ? "rgba(38,166,154,0.45)" : "rgba(239,83,80,0.45)",
+        color: up ? colors.upVol : colors.downVol,
       };
     });
 
@@ -225,6 +266,19 @@
 
     const last = series[series.length - 1];
     updateOhlcBar(metaByTime.get(last.time));
+  }
+
+  function trendArrowMarkup(trend) {
+    if (trend === "up") {
+      return '<span class="trend-arrow trend-up" title="上次修改：行数上涨">▲</span>';
+    }
+    if (trend === "down") {
+      return '<span class="trend-arrow trend-down" title="上次修改：行数下跌">▼</span>';
+    }
+    if (trend === "flat") {
+      return '<span class="trend-arrow trend-flat" title="上次修改：行数持平">—</span>';
+    }
+    return '<span class="trend-arrow trend-none" title="暂无修改记录">·</span>';
   }
 
   function renderSymbols(symbols, activeFile) {
@@ -242,6 +296,8 @@
         li.classList.add("ipo");
       }
       li.innerHTML =
+        trendArrowMarkup(s.last_trend) +
+        '<div class="symbol-body">' +
         '<div class="symbol-name">' +
         escapeHtml(shortName(s.file)) +
         (s.is_new ? '<span class="badge-new">新</span>' : "") +
@@ -251,7 +307,7 @@
         s.last_lines +
         " 行 · 净" +
         formatNet(s.total_net) +
-        "</div>";
+        "</div></div>";
       li.addEventListener("click", () => {
         vscode.postMessage({ type: "selectSymbol", file: s.file });
       });

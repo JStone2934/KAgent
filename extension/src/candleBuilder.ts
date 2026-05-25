@@ -1,4 +1,11 @@
-import { Candle, KagentEvent, MarketPayload, SymbolSummary, SymbolsFile } from "./types";
+import {
+  Candle,
+  KagentEvent,
+  LastEditTrend,
+  MarketPayload,
+  SymbolSummary,
+  SymbolsFile,
+} from "./types";
 
 const NEW_IPO_WINDOW_MS = 60_000;
 
@@ -36,6 +43,30 @@ export function buildCandlesForFile(events: KagentEvent[], file: string): Candle
     .map(eventToCandle);
 }
 
+/** 最近一次编辑的涨跌（收盘行数 vs 开盘行数，与 K 线颜色一致） */
+export function lastEditTrendForFile(
+  events: KagentEvent[],
+  file: string
+): LastEditTrend | null {
+  const fileEvents = events.filter((e) => e.file === file);
+  if (!fileEvents.length) {
+    return null;
+  }
+  const last = fileEvents.reduce((a, b) =>
+    a.edit_index > b.edit_index ||
+    (a.edit_index === b.edit_index && a.ts >= b.ts)
+      ? a
+      : b
+  );
+  if (last.lines_after > last.lines_before) {
+    return "up";
+  }
+  if (last.lines_after < last.lines_before) {
+    return "down";
+  }
+  return "flat";
+}
+
 export function buildMarketPayload(
   events: KagentEvent[],
   symbolsDoc: SymbolsFile,
@@ -66,6 +97,7 @@ export function buildMarketPayload(
         last_lines: info?.last_lines ?? 0,
         last_ts: info?.last_ts ?? ipo_ts,
         total_net: netByFile.get(file) ?? 0,
+        last_trend: lastEditTrendForFile(events, file),
         is_new: now - ipo_ts < NEW_IPO_WINDOW_MS,
       };
     })

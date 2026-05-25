@@ -1,3 +1,11 @@
+/* A 股配色：红涨绿跌（填充/边框/影线/UI 共用同一色号） */
+:root {
+  --kagent-up: #e53935;
+  --kagent-down: #43a047;
+  --kagent-up-rgb: 229, 57, 53;
+  --kagent-down-rgb: 67, 160, 71;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -72,9 +80,40 @@ body {
 }
 
 .symbol-list li {
-  padding: 6px 10px;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 6px 8px 6px 6px;
   cursor: pointer;
   border-left: 3px solid transparent;
+}
+
+.symbol-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.trend-arrow {
+  flex-shrink: 0;
+  width: 14px;
+  font-size: 11px;
+  line-height: 1.35;
+  font-weight: 700;
+  text-align: center;
+}
+
+.trend-arrow.trend-up {
+  color: var(--kagent-up);
+}
+
+.trend-arrow.trend-down {
+  color: var(--kagent-down);
+}
+
+.trend-arrow.trend-flat,
+.trend-arrow.trend-none {
+  color: var(--vscode-descriptionForeground);
+  font-weight: 400;
 }
 
 .symbol-list li:hover {
@@ -87,7 +126,7 @@ body {
 }
 
 .symbol-list li.ipo {
-  border-left-color: #26a69a;
+  border-left-color: var(--kagent-up);
 }
 
 .symbol-name {
@@ -104,7 +143,7 @@ body {
   font-size: 9px;
   padding: 0 4px;
   margin-left: 4px;
-  background: #26a69a;
+  background: var(--kagent-up);
   color: #fff;
   border-radius: 2px;
 }
@@ -152,11 +191,11 @@ body {
 }
 
 .ohlc-up strong {
-  color: #26a69a;
+  color: var(--kagent-up);
 }
 
 .ohlc-down strong {
-  color: #ef5350;
+  color: var(--kagent-down);
 }
 
 #chart-container {

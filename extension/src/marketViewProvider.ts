@@ -179,12 +179,12 @@ export class MarketViewProvider implements vscode.WebviewViewProvider {
     </aside>
     <main class="chart-panel">
       <div id="chart-title" class="chart-title">选择一只股票</div>
-      <div class="chart-legend muted">开/收=改前/改后行数，高/低=该轮最大/最小行数</div>
+      <div class="chart-legend muted">开/收=改前/改后行数，高/低=该轮最大/最小行数 · 红涨绿跌</div>
       <div id="ohlc-bar" class="ohlc-bar">
         <span class="ohlc-item"><em>轮次</em><strong id="ohlc-round">—</strong></span>
-        <span class="ohlc-item ohlc-up"><em>开</em><strong id="ohlc-open">—</strong></span>
-        <span class="ohlc-item ohlc-up"><em>高</em><strong id="ohlc-high">—</strong></span>
-        <span class="ohlc-item ohlc-down"><em>低</em><strong id="ohlc-low">—</strong></span>
+        <span class="ohlc-item"><em>开</em><strong id="ohlc-open">—</strong></span>
+        <span class="ohlc-item"><em>高</em><strong id="ohlc-high">—</strong></span>
+        <span class="ohlc-item"><em>低</em><strong id="ohlc-low">—</strong></span>
         <span class="ohlc-item"><em>收</em><strong id="ohlc-close">—</strong></span>
         <span class="ohlc-item"><em>量</em><strong id="ohlc-volume">—</strong></span>
       </div>

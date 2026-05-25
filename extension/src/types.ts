@@ -41,6 +41,9 @@ export interface Candle {
   is_ipo?: boolean;
 }
 
+/** 最近一次编辑相对上一状态的涨跌（与 K 线阴阳一致：收≥开为涨） */
+export type LastEditTrend = "up" | "down" | "flat";
+
 export interface SymbolSummary {
   file: string;
   ipo_ts: number;
@@ -48,6 +51,8 @@ export interface SymbolSummary {
   last_lines: number;
   last_ts: number;
   total_net: number;
+  /** 上次修改涨势，无事件时为 null */
+  last_trend: LastEditTrend | null;
   is_new?: boolean;
 }
 
