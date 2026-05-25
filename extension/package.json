@@ -52,6 +52,21 @@
           "group": "navigation"
         }
       ]
+    },
+    "configuration": {
+      "title": "KAgent",
+      "properties": {
+        "kagent.colorScheme": {
+          "type": "string",
+          "enum": ["cn", "us"],
+          "enumDescriptions": [
+            "红涨绿跌（中国大陆 A 股）",
+            "绿涨红跌（美股）"
+          ],
+          "default": "cn",
+          "description": "行情图与列表的涨跌配色方案"
+        }
+      }
     }
   },
   "scripts": {

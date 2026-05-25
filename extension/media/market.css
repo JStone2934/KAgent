@@ -1,9 +1,17 @@
-/* A 股配色：红涨绿跌（填充/边框/影线/UI 共用同一色号） */
-:root {
+/* 涨/跌色号：填充、边框、影线、箭头共用（由 data-color-scheme 切换） */
+:root,
+[data-color-scheme="cn"] {
   --kagent-up: #e53935;
   --kagent-down: #43a047;
   --kagent-up-rgb: 229, 57, 53;
   --kagent-down-rgb: 67, 160, 71;
+}
+
+[data-color-scheme="us"] {
+  --kagent-up: #43a047;
+  --kagent-down: #e53935;
+  --kagent-up-rgb: 67, 160, 71;
+  --kagent-down-rgb: 229, 57, 53;
 }
 
 * {
@@ -163,10 +171,47 @@ body {
   background: var(--vscode-editor-background);
 }
 
-.chart-title {
+.chart-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   padding: 8px 12px 0;
+}
+
+.chart-title {
   font-weight: 600;
   font-size: 12px;
+  min-width: 0;
+  flex: 1;
+}
+
+.scheme-switch {
+  display: flex;
+  flex-shrink: 0;
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.scheme-btn {
+  margin: 0;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-family: inherit;
+  border: none;
+  background: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+  cursor: pointer;
+}
+
+.scheme-btn:hover {
+  background: var(--vscode-button-secondaryHoverBackground);
+}
+
+.scheme-btn.active {
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
 }
 
 .chart-legend {

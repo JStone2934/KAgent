@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { isColorSchemeConfigChange } from "./colorScheme";
 import { MarketViewProvider } from "./marketViewProvider";
 import { installProjectHooks, hooksConfigured } from "./hookInstaller";
 
@@ -32,6 +33,14 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.commands.registerCommand("kagent.refresh", () => {
       void marketProvider?.refresh();
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeConfiguration((e) => {
+      if (isColorSchemeConfigChange(e)) {
+        void marketProvider?.refresh();
+      }
     })
   );
 

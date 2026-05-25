@@ -36,6 +36,11 @@
   let volumeSeries = null;
   const metaByTime = new Map();
   let lastCandles = [];
+  let lastSelectedFile = null;
+  let colorScheme = "cn";
+  let schemeSwitchBound = false;
+
+  const SCHEME_LEGEND = { cn: "红涨绿跌", us: "绿涨红跌" };
 
   const els = {
     banner: document.getElementById("banner"),
@@ -43,6 +48,8 @@
     symbolCount: document.getElementById("symbol-count"),
     emptyHint: document.getElementById("empty-hint"),
     chartTitle: document.getElementById("chart-title"),
+    chartLegend: document.getElementById("chart-legend"),
+    schemeSwitch: document.querySelector(".scheme-switch"),
     chartContainer: document.getElementById("chart-container"),
     chartError: document.getElementById("chart-error"),
     ohlcRound: document.getElementById("ohlc-round"),
@@ -55,6 +62,41 @@
 
   function formatNet(n) {
     return (n > 0 ? "+" : "") + n;
+  }
+
+  function applyColorScheme(scheme) {
+    colorScheme = scheme === "us" ? "us" : "cn";
+    document.documentElement.dataset.colorScheme = colorScheme;
+    document.body.dataset.colorScheme = colorScheme;
+    els.schemeSwitch?.querySelectorAll(".scheme-btn").forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.scheme === colorScheme);
+    });
+    if (els.chartLegend) {
+      els.chartLegend.textContent =
+        "开/收=改前/改后行数，高/低=该轮最大/最小行数 · " +
+        SCHEME_LEGEND[colorScheme];
+    }
+    if (candleSeries && lastCandles.length && lastSelectedFile) {
+      renderChart(lastSelectedFile, lastCandles);
+    } else if (candleSeries) {
+      candleSeries.applyOptions(candlestickSeriesOptions(getKagentColors()));
+    }
+  }
+
+  function bindSchemeSwitch() {
+    if (schemeSwitchBound || !els.schemeSwitch) {
+      return;
+    }
+    schemeSwitchBound = true;
+    els.schemeSwitch.querySelectorAll(".scheme-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const next = btn.dataset.scheme === "us" ? "us" : "cn";
+        if (next === colorScheme) {
+          return;
+        }
+        vscode.postMessage({ type: "setColorScheme", scheme: next });
+      });
+    });
   }
 
   function showChartError(msg) {
@@ -344,6 +386,11 @@
       return;
     }
     const payload = event.data.payload;
+    lastSelectedFile = payload.selectedFile ?? null;
+    if (payload.colorScheme) {
+      applyColorScheme(payload.colorScheme);
+    }
+    bindSchemeSwitch();
     updateBanner(payload);
     renderSymbols(payload.symbols, payload.selectedFile);
     requestAnimationFrame(() => {
@@ -351,5 +398,7 @@
     });
   });
 
+  bindSchemeSwitch();
+  applyColorScheme(document.body.dataset.colorScheme || "cn");
   vscode.postMessage({ type: "ready" });
 })();

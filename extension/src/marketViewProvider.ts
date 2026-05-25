@@ -1,6 +1,11 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
+import {
+  ColorScheme,
+  getColorScheme,
+  setColorScheme,
+} from "./colorScheme";
 import { buildMarketPayload } from "./candleBuilder";
 import { readAllEvents, readSymbols } from "./eventStore";
 import { getKagentDir } from "./paths";
@@ -40,6 +45,10 @@ export class MarketViewProvider implements vscode.WebviewViewProvider {
       }
       if (msg.type === "ready") {
         void this.pushUpdate();
+      }
+      if (msg.type === "setColorScheme") {
+        const scheme: ColorScheme = msg.scheme === "us" ? "us" : "cn";
+        void setColorScheme(scheme).then(() => this.pushUpdate());
       }
     });
 
@@ -116,7 +125,11 @@ export class MarketViewProvider implements vscode.WebviewViewProvider {
   }
 
   private async loadPayload(): Promise<
-    MarketPayload & { hooksOk: boolean; kagentDir: string | null }
+    MarketPayload & {
+      hooksOk: boolean;
+      kagentDir: string | null;
+      colorScheme: ColorScheme;
+    }
   > {
     const kagentDir = getKagentDir();
     const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -128,6 +141,7 @@ export class MarketViewProvider implements vscode.WebviewViewProvider {
         candles: {},
         hooksOk: false,
         kagentDir: null,
+        colorScheme: getColorScheme(),
       };
     }
 
@@ -143,7 +157,7 @@ export class MarketViewProvider implements vscode.WebviewViewProvider {
       ? fs.existsSync(path.join(workspaceRoot, ".cursor", "hooks.json"))
       : false;
 
-    return { ...market, hooksOk, kagentDir };
+    return { ...market, hooksOk, kagentDir, colorScheme: getColorScheme() };
   }
 
   private getHtml(webview: vscode.Webview): string {
@@ -166,7 +180,7 @@ export class MarketViewProvider implements vscode.WebviewViewProvider {
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="${styleUri}" />
 </head>
-<body>
+<body data-color-scheme="cn">
   <div id="banner" class="banner hidden"></div>
   <div class="layout">
     <aside class="sidebar">
@@ -178,8 +192,14 @@ export class MarketViewProvider implements vscode.WebviewViewProvider {
       <p id="empty-hint" class="empty-hint">暂无股票。Agent 修改文件后会出现。</p>
     </aside>
     <main class="chart-panel">
-      <div id="chart-title" class="chart-title">选择一只股票</div>
-      <div class="chart-legend muted">开/收=改前/改后行数，高/低=该轮最大/最小行数 · 红涨绿跌</div>
+      <div class="chart-header">
+        <div id="chart-title" class="chart-title">选择一只股票</div>
+        <div class="scheme-switch" role="group" aria-label="配色方案">
+          <button type="button" class="scheme-btn" data-scheme="cn" title="红涨绿跌">A股</button>
+          <button type="button" class="scheme-btn" data-scheme="us" title="绿涨红跌">美股</button>
+        </div>
+      </div>
+      <div id="chart-legend" class="chart-legend muted">开/收=改前/改后行数，高/低=该轮最大/最小行数</div>
       <div id="ohlc-bar" class="ohlc-bar">
         <span class="ohlc-item"><em>轮次</em><strong id="ohlc-round">—</strong></span>
         <span class="ohlc-item"><em>开</em><strong id="ohlc-open">—</strong></span>
