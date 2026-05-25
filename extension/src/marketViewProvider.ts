@@ -35,6 +35,7 @@ export class MarketViewProvider implements vscode.WebviewViewProvider {
     webviewView.webview.onDidReceiveMessage((msg) => {
       if (msg.type === "selectSymbol") {
         this.selectedFile = msg.file ?? null;
+        void this.openSelectedFileInEditor(this.selectedFile);
         void this.pushUpdate();
       }
       if (msg.type === "ready") {
@@ -58,6 +59,30 @@ export class MarketViewProvider implements vscode.WebviewViewProvider {
 
   async refresh(): Promise<void> {
     await this.pushUpdate();
+  }
+
+  /** 选中股票时在编辑器中打开对应源码（相对工作区路径）。 */
+  private async openSelectedFileInEditor(
+    relativeFile: string | null
+  ): Promise<void> {
+    if (!relativeFile) {
+      return;
+    }
+    const folder = vscode.workspace.workspaceFolders?.[0];
+    if (!folder) {
+      return;
+    }
+    const uri = vscode.Uri.joinPath(folder.uri, relativeFile);
+    try {
+      await vscode.window.showTextDocument(uri, {
+        preview: false,
+        preserveFocus: false,
+      });
+    } catch {
+      void vscode.window.showWarningMessage(
+        `KAgent: 无法打开文件 ${relativeFile}（可能已删除或不在工作区内）`
+      );
+    }
   }
 
   private setupWatchers(): void {
