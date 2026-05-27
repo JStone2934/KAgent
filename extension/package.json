@@ -115,7 +115,7 @@
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "postinstall": "cp node_modules/lightweight-charts/dist/lightweight-charts.standalone.production.js media/lightweight-charts.js",
+    "postinstall": "node -e \"require('fs').copyFileSync('node_modules/lightweight-charts/dist/lightweight-charts.standalone.production.js','media/lightweight-charts.js')\"",
     "package": "vsce package --no-dependencies"
   },
   "dependencies": {

@@ -184,13 +184,24 @@ npm run package                  # → kagent-x.y.z.vsix
 | Concept art | [docs/images/concept.png](docs/images/concept.png) |
 | Demo walkthrough | [demo/watch-me.md](demo/watch-me.md) |
 
-### Publish to Open VSX (maintainers)
+### Release (maintainers)
 
-CI workflow: [.github/workflows/publish-openvsx.yml](.github/workflows/publish-openvsx.yml).
+| Workflow | Purpose |
+|----------|---------|
+| [CI](.github/workflows/ci.yml) | On `main` / PR changes under `extension/`: compile and package VSIX (uploaded as Artifact) |
+| [Release](.github/workflows/release.yml) | Manual release: bump version → Open VSX → push tag → [GitHub Release](https://github.com/JStone2934/KAgent/releases) with `.vsix` |
+
+**One-time setup**
 
 1. Create an access token at [open-vsx.org](https://open-vsx.org/user-settings/tokens) (namespace **JStone** must exist).
 2. Add GitHub Actions secret **OVSX_PAT**.
-3. **Actions → Publish to Open VSX → Run workflow** — choose `patch` / `minor` / `major` to bump semver and publish.
+
+**Ship a version**
+
+1. **Actions → Release → Run workflow**
+2. Choose `patch` / `minor` / `major`
+3. Toggle **Publish to Open VSX** (uncheck for GitHub Release–only)
+4. Download the VSIX from [Releases](https://github.com/JStone2934/KAgent/releases); Open VSX updates when enabled
 
 Manual publish (never paste the token on the command line; use an env var):
 

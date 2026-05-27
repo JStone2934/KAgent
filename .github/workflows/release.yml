@@ -1,0 +1,123 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_bump:
+        description: Semver bump (only for manual release)
+        required: true
+        default: patch
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+      publish_openvsx:
+        description: Publish to Open VSX Registry
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: extension
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: extension/package-lock.json
+
+      - name: Bump version
+        id: meta
+        run: |
+          npm version ${{ inputs.version_bump }} --no-git-tag-version
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "vsix=kagent-${VERSION}.vsix" >> "$GITHUB_OUTPUT"
+          echo "Release version: v${VERSION}"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Compile
+        run: npm run compile
+
+      - name: Package VSIX
+        run: npx @vscode/vsce package --no-dependencies
+
+      - name: Validate Open VSX token
+        if: inputs.publish_openvsx
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+        run: |
+          if [ -z "$OVSX_PAT" ]; then
+            echo "::error::OVSX_PAT secret is missing. Add it under Settings → Secrets → Actions, or disable Open VSX publish."
+            exit 1
+          fi
+
+      - name: Publish to Open VSX
+        if: inputs.publish_openvsx
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+        run: npx ovsx publish --no-dependencies -p "$OVSX_PAT"
+
+      - name: Commit version bump and push tag
+        working-directory: ${{ github.workspace }}
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
+          TAG: ${{ steps.meta.outputs.tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add extension/package.json extension/package-lock.json
+          git commit -m "chore(extension): release v${VERSION}"
+          git tag "${TAG}"
+          git push origin HEAD
+          git push origin "${TAG}"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: KAgent ${{ steps.meta.outputs.tag }}
+          generate_release_notes: true
+          body: |
+            ## Install
+
+            | Channel | Link |
+            |---------|------|
+            | **VSIX (Cursor)** | Download `${{ steps.meta.outputs.vsix }}` below |
+            | **Open VSX** | https://open-vsx.org/extension/JStone/kagent |
+
+            ```bash
+            cursor --install-extension ${{ steps.meta.outputs.vsix }}
+            codium --install-extension JStone.kagent
+            ```
+
+            See [README](https://github.com/${{ github.repository }}#readme) for hooks setup.
+          files: extension/${{ steps.meta.outputs.vsix }}
+
+      - name: Upload VSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.meta.outputs.vsix }}
+          path: extension/${{ steps.meta.outputs.vsix }}

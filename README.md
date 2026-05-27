@@ -212,15 +212,26 @@ npm run package                  # 产出 kagent-x.y.z.vsix
 | 演示说明 | [demo/watch-me.md](demo/watch-me.md) |
 
 
-### 发布到 Open VSX（维护者）
+### 发布 Release（维护者）
 
-仓库已配置 GitHub Actions：[.github/workflows/publish-openvsx.yml](.github/workflows/publish-openvsx.yml)。
+| Workflow | 作用 |
+|----------|------|
+| [CI](.github/workflows/ci.yml) | `main` / PR 变更 `extension/` 时自动编译并打包 VSIX（产物为 Artifact） |
+| [Release](.github/workflows/release.yml) | 手动发版：递增版本 → Open VSX → 推送 tag → [GitHub Release](https://github.com/JStone2934/KAgent/releases) 附带 `.vsix` |
 
-1. 在 [open-vsx.org](https://open-vsx.org/user-settings/tokens) 创建 Access Token（namespace **JStone** 须已存在）。
-2. 在 GitHub 仓库 **Settings → Secrets → Actions** 添加 **OVSX_PAT**。
-3. **Actions → Publish to Open VSX → Run workflow**，选择 `patch` / `minor` / `major` 自动递增版本并发布。
+**一次性配置**
 
-本地手动发布（勿在命令行明文粘贴 token，请用环境变量）：
+1. [open-vsx.org](https://open-vsx.org/user-settings/tokens) 创建 Access Token（namespace **JStone** 须已存在）。
+2. 仓库 **Settings → Secrets → Actions** 添加 **OVSX_PAT**。
+
+**发版步骤**
+
+1. **Actions → Release → Run workflow**
+2. 选择 `patch` / `minor` / `major`
+3. 是否勾选 **Publish to Open VSX**（仅需 GitHub Release 时可取消）
+4. 完成后在 [Releases](https://github.com/JStone2934/KAgent/releases) 下载 VSIX，Open VSX 同步更新
+
+本地手动发布（勿在命令行明文粘贴 token）：
 
 ```powershell
 cd extension
