@@ -13,10 +13,10 @@ import { buildMarketPayload } from "./candleBuilder";
 import { readAllEvents, readSymbols } from "./eventStore";
 import { isCaptureOnSaveEnabled } from "./kagentConfig";
 import { getKagentDir, getKagentWorkspaceFolder } from "./paths";
-import { syncDelistedSymbols } from "./symbolDelist";
+import { DELIST_PURGE_AFTER_MS, syncDelistedSymbols } from "./symbolDelist";
 import { isFileMissingInWorkspace } from "./workspaceFiles";
 import { syncSnapshotsFromSymbols } from "./snapshotSync";
-import { MarketPayload } from "./types";
+import { MarketPayload, SymbolsFile } from "./types";
 
 export class MarketViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = "kagent.marketView";
@@ -25,6 +25,7 @@ export class MarketViewProvider implements vscode.WebviewViewProvider {
   private selectedFile: string | null = null;
   private watchers: vscode.FileSystemWatcher[] = [];
   private refreshTimer?: ReturnType<typeof setTimeout>;
+  private delistPurgeTimer?: ReturnType<typeof setTimeout>;
   private messageDisposable?: vscode.Disposable;
   private readonly extensionVersion: string;
 
@@ -73,16 +74,26 @@ export class MarketViewProvider implements vscode.WebviewViewProvider {
     void this.pushUpdate();
   }
 
-  disposeWatchers(): void {
-    this.messageDisposable?.dispose();
-    this.messageDisposable = undefined;
+  /** 仅释放文件监视器（勿动 webview 消息监听） */
+  private disposeFileWatchers(): void {
     for (const w of this.watchers) {
       w.dispose();
     }
     this.watchers = [];
     if (this.refreshTimer) {
       clearTimeout(this.refreshTimer);
+      this.refreshTimer = undefined;
     }
+    if (this.delistPurgeTimer) {
+      clearTimeout(this.delistPurgeTimer);
+      this.delistPurgeTimer = undefined;
+    }
+  }
+
+  disposeWatchers(): void {
+    this.messageDisposable?.dispose();
+    this.messageDisposable = undefined;
+    this.disposeFileWatchers();
   }
 
   async refresh(): Promise<void> {
@@ -112,7 +123,7 @@ export class MarketViewProvider implements vscode.WebviewViewProvider {
   }
 
   private setupWatchers(): void {
-    this.disposeWatchers();
+    this.disposeFileWatchers();
     const kagentDir = getKagentDir();
     if (!kagentDir) {
       return;
@@ -167,6 +178,36 @@ export class MarketViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  private scheduleDelistPurgeRefresh(symbolsDoc: SymbolsFile): void {
+    if (this.delistPurgeTimer) {
+      clearTimeout(this.delistPurgeTimer);
+      this.delistPurgeTimer = undefined;
+    }
+
+    const now = Date.now();
+    let nextDelay: number | undefined;
+    for (const info of Object.values(symbolsDoc.symbols)) {
+      if (!info.delisted) {
+        continue;
+      }
+      const delistedAt = info.delisted_at ?? now;
+      const delay = Math.max(
+        250,
+        delistedAt + DELIST_PURGE_AFTER_MS - now + 50
+      );
+      nextDelay = Math.min(nextDelay ?? delay, delay);
+    }
+
+    if (nextDelay === undefined) {
+      return;
+    }
+
+    this.delistPurgeTimer = setTimeout(() => {
+      this.delistPurgeTimer = undefined;
+      void this.pushUpdate();
+    }, nextDelay);
+  }
+
   private async loadPayload(): Promise<
     MarketPayload & {
       hooksOk: boolean;
@@ -205,6 +246,7 @@ export class MarketViewProvider implements vscode.WebviewViewProvider {
         /* 锁冲突时继续用已读 symbols + 下方 VS Code stat 检测 */
       }
     }
+    this.scheduleDelistPurgeRefresh(symbolsDoc);
     const market = buildMarketPayload(
       events,
       symbolsDoc,

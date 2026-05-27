@@ -4,7 +4,7 @@ import * as vscode from "vscode";
 import { readSymbols } from "./eventStore";
 import { ensureKagentConfig, isCaptureOnSaveEnabled } from "./kagentConfig";
 import { countLines } from "./lineStats";
-import { recordFileChange } from "./recordChange";
+import { countFileLines, recordFileChange } from "./recordChange";
 
 /** 上次记入行情后的文件内容（用于保存前后 diff，勿用打开时的编辑器内容初始化） */
 const lastRecordedContent = new Map<string, string>();
@@ -66,6 +66,20 @@ function relativePath(
   return rel.split(path.sep).join("/");
 }
 
+function relativePathFromUri(
+  uri: vscode.Uri,
+  workspaceRoot: string
+): string | null {
+  if (uri.scheme !== "file") {
+    return null;
+  }
+  const rel = path.relative(workspaceRoot, uri.fsPath);
+  if (rel.startsWith("..") || path.isAbsolute(rel)) {
+    return null;
+  }
+  return rel.split(path.sep).join("/");
+}
+
 function editorId(): string {
   return vscode.env.appName.toLowerCase().includes("cursor") ? "cursor" : "vscode";
 }
@@ -121,10 +135,62 @@ export function registerSaveCapture(context: vscode.ExtensionContext): void {
   );
 
   context.subscriptions.push(
+    vscode.workspace.onDidCreateFiles((e) => {
+      for (const uri of e.files) {
+        void handleCreatedFile(uri);
+      }
+    })
+  );
+
+  context.subscriptions.push(
     vscode.workspace.onDidSaveTextDocument((doc) => {
       void handleSave(doc);
     })
   );
+}
+
+async function handleCreatedFile(uri: vscode.Uri): Promise<void> {
+  const folder = vscode.workspace.getWorkspaceFolder(uri) ?? vscode.workspace.workspaceFolders?.[0];
+  if (!folder) {
+    return;
+  }
+  const workspaceRoot = folder.uri.fsPath;
+  const kagentDir = path.join(workspaceRoot, ".kagent");
+
+  if (!isCaptureOnSaveEnabled(kagentDir)) {
+    return;
+  }
+
+  const rel = relativePathFromUri(uri, workspaceRoot);
+  if (!rel) {
+    return;
+  }
+
+  try {
+    const stat = fs.statSync(uri.fsPath);
+    if (!stat.isFile()) {
+      return;
+    }
+  } catch {
+    return;
+  }
+
+  ensureKagentConfig(kagentDir);
+  const linesAfter = countFileLines(uri.fsPath);
+  const result = recordFileChange({
+    workspaceRoot,
+    relativeFile: rel,
+    linesAfter,
+    oldText: "",
+    source: "onSave",
+    actor: "human",
+    save_reason: "create",
+    editor: editorId(),
+  });
+
+  if (result.recorded || result.reason === "coalesced" || result.reason === "unchanged") {
+    lastRecordedContent.set(rel, readDiskText(workspaceRoot, rel));
+  }
 }
 
 async function handleSave(doc: vscode.TextDocument): Promise<void> {

@@ -39,6 +39,7 @@
   let lastCandles = [];
   let lastSelectedFile = null;
   let lastRenderedFile = null;
+  let lastSeriesLength = 0;
   let lastSymbols = [];
   let lastMissingFiles = new Set();
   const candlesByFile = new Map();
@@ -48,7 +49,6 @@
   let toneSwitchBound = false;
   let symbolListBound = false;
   let userAdjustedViewport = false;
-  let suppressViewportChange = false;
 
   const SCHEME_LEGEND = { cn: "红涨绿跌", us: "绿涨红跌" };
 
@@ -195,6 +195,17 @@
     }
 
     vscode.postMessage({ type: "selectSymbol", file });
+  }
+
+  function bindChartViewportInteractions() {
+    const markAdjusted = () => {
+      userAdjustedViewport = true;
+    };
+    els.chartContainer.addEventListener("wheel", markAdjusted, { passive: true });
+    els.chartContainer.addEventListener("pointerdown", markAdjusted);
+    els.chartContainer.addEventListener("touchstart", markAdjusted, {
+      passive: true,
+    });
   }
 
   function showChartError(msg) {
@@ -368,25 +379,20 @@
       }
     });
 
-    chart.timeScale().subscribeVisibleLogicalRangeChange(() => {
-      if (!suppressViewportChange) {
-        userAdjustedViewport = true;
-      }
-    });
-
+    bindChartViewportInteractions();
     new ResizeObserver(() => resizeChart()).observe(els.chartContainer);
     return true;
   }
 
-  function withSuppressedViewportChange(fn) {
-    suppressViewportChange = true;
-    try {
-      fn();
-    } finally {
-      requestAnimationFrame(() => {
-        suppressViewportChange = false;
-      });
-    }
+  function isNearLatestRange(range, seriesLength) {
+    return Boolean(range && seriesLength > 0 && range.to >= seriesLength - 1.5);
+  }
+
+  function shiftRangeBy(range, delta) {
+    return {
+      from: range.from + delta,
+      to: range.to + delta,
+    };
   }
 
   function renderChart(file, candles, options = {}) {
@@ -410,6 +416,7 @@
       }
       updateOhlcBar(null);
       lastRenderedFile = file ?? null;
+      lastSeriesLength = 0;
       return;
     }
 
@@ -435,21 +442,26 @@
     const previousRange = sameFile
       ? chart.timeScale().getVisibleLogicalRange()
       : null;
+    const wasNearLatest = isNearLatestRange(previousRange, lastSeriesLength);
 
     candleSeries.setData(series);
     volumeSeries.setData(vol);
-    withSuppressedViewportChange(() => {
-      if (
-        (options.preserveViewport || (sameFile && userAdjustedViewport)) &&
-        previousRange
-      ) {
-        chart.timeScale().setVisibleLogicalRange(previousRange);
+    if (options.preserveViewport && previousRange) {
+      chart.timeScale().setVisibleLogicalRange(previousRange);
+    } else if (sameFile && userAdjustedViewport && previousRange) {
+      if (wasNearLatest) {
+        chart.timeScale().setVisibleLogicalRange(
+          shiftRangeBy(previousRange, series.length - lastSeriesLength)
+        );
       } else {
-        chart.timeScale().fitContent();
+        chart.timeScale().setVisibleLogicalRange(previousRange);
       }
-      resizeChart();
-    });
+    } else {
+      chart.timeScale().fitContent();
+    }
+    resizeChart();
     lastRenderedFile = file;
+    lastSeriesLength = series.length;
     if (!sameFile) {
       userAdjustedViewport = false;
     }

@@ -31,7 +31,9 @@ export interface SymbolInfo {
   last_lines: number;
   last_ts: number;
   delisted?: boolean;
-  /** 退市后经历的刷新轮次，满阈值后从 symbols 移除 */
+  /** 标记退市的时间，用于给 ST 状态保留稳定展示窗口 */
+  delisted_at?: number;
+  /** 旧版退市刷新轮次字段，保留用于兼容已有 symbols.json */
   delist_rounds?: number;
   last_source?: string;
   last_content_hash?: string;

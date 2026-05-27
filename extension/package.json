@@ -3,7 +3,7 @@
   "icon": "icon.png",
   "displayName": "KAgent",
   "description": "将文件保存与 Agent 修改以股票 K 线图展示（一文件一股）",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "publisher": "JStone",
   "license": "MIT",
   "repository": {

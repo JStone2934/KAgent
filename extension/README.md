@@ -13,9 +13,10 @@ Visualize Cursor Agent file edits as stock-style candlesticks: one file per tick
 ## 功能 · Features
 
 - 通过 [Cursor Hooks](https://cursor.com/docs/hooks) `afterFileEdit` 自动采集 / Auto-capture via `afterFileEdit`
-- 可选保存时采集 `kagent.capture.onSave` / Optional capture on file save
+- 可选保存/新建文件时采集 `kagent.capture.onSave` / Optional capture on file save and file create
 - 活动栏 **KAgent** 侧边栏：列表 + K 线 + 成交量 / Sidebar list, chart, and volume
-- 手动删除文件 → **ST退市** 灰色标记，多轮刷新后下市 / **ST delisted** gray state after manual file delete
+- 手动删除文件 → **ST退市** 灰色标记，保留约 30 秒后下市 / **ST delisted** gray state after manual file delete, purged after about 30s
+- 拖动/缩放 K 线后保留视图；停在最新 K 线附近时保存会自动跟随 / Preserve chart pan/zoom; auto-follow when viewing latest candles
 - A 股 / 美股配色、亮 / 暗主题 / CN & US color schemes, light & dark tones
 - 离线内置图表 / Offline bundled chart
 
