@@ -3,7 +3,7 @@
   "icon": "icon.png",
   "displayName": "KAgent",
   "description": "将 Cursor Agent 文件修改以股票 K 线图展示（一文件一股）",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "publisher": "JStone",
   "license": "MIT",
   "repository": {
@@ -24,12 +24,17 @@
   "engines": {
     "vscode": "^1.85.0"
   },
-  "categories": ["Other", "Visualization"],
+  "categories": [
+    "Other",
+    "Visualization"
+  ],
   "galleryBanner": {
     "color": "#1e1e2e",
     "theme": "dark"
   },
-  "activationEvents": ["onStartupFinished"],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
@@ -79,7 +84,10 @@
       "properties": {
         "kagent.colorScheme": {
           "type": "string",
-          "enum": ["cn", "us"],
+          "enum": [
+            "cn",
+            "us"
+          ],
           "enumDescriptions": [
             "红涨绿跌（中国大陆 A 股）",
             "绿涨红跌（美股）"
@@ -89,7 +97,10 @@
         },
         "kagent.colorTone": {
           "type": "string",
-          "enum": ["light", "dark"],
+          "enum": [
+            "light",
+            "dark"
+          ],
           "enumDescriptions": [
             "亮色涨跌色号",
             "暗色涨跌色号（适合深色背景）"
