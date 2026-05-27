@@ -38,6 +38,8 @@
   const metaByTime = new Map();
   let lastCandles = [];
   let lastSelectedFile = null;
+  let lastSymbols = [];
+  let lastMissingFiles = new Set();
   let colorScheme = "cn";
   let colorTone = "light";
   let schemeSwitchBound = false;
@@ -308,8 +310,15 @@
 
   function renderChart(file, candles) {
     lastCandles = candles ?? [];
+    const delisted =
+      file &&
+      normalizeSymbols(lastSymbols).some(
+        (s) => s.file === file && s.is_delisted
+      );
     els.chartTitle.textContent = file
-      ? file + "（" + lastCandles.length + " 根 K 线）"
+      ? file +
+        (delisted ? " · ST退市" : "") +
+        "（" + lastCandles.length + " 根 K 线）"
       : "选择一只股票";
 
     if (!file || !lastCandles.length) {
@@ -361,27 +370,44 @@
     return '<span class="trend-arrow trend-none" title="暂无修改记录">·</span>';
   }
 
-  function renderSymbols(symbols, activeFile) {
-    els.symbolList.innerHTML = "";
-    els.symbolCount.textContent = String(symbols.length);
-    els.emptyHint.classList.toggle("hidden", symbols.length > 0);
+  function isSymbolDelisted(s) {
+    return Boolean(s.is_delisted || lastMissingFiles.has(s.file));
+  }
 
-    for (const s of symbols) {
+  function normalizeSymbols(symbols) {
+    return (symbols ?? []).map((s) => ({
+      ...s,
+      is_delisted: isSymbolDelisted(s),
+    }));
+  }
+
+  function renderSymbols(symbols, activeFile) {
+    const list = normalizeSymbols(symbols);
+    els.symbolList.innerHTML = "";
+    els.symbolCount.textContent = String(list.length);
+    els.emptyHint.classList.toggle("hidden", list.length > 0);
+
+    for (const s of list) {
       const li = document.createElement("li");
       li.className = "symbol-item";
       if (s.file === activeFile) {
         li.classList.add("active");
       }
-      if (s.is_new) {
+      if (s.is_delisted) {
+        li.classList.add("delisted");
+      } else if (s.is_new) {
         li.classList.add("ipo");
       } else if (s.is_recent) {
         li.classList.add("recent-edit");
       }
       li.innerHTML =
-        trendArrowMarkup(s.last_trend) +
+        trendArrowMarkup(s.is_delisted ? null : s.last_trend) +
         '<div class="symbol-body">' +
         '<div class="symbol-name">' +
         escapeHtml(shortName(s.file)) +
+        (s.is_delisted
+          ? '<span class="badge-activity badge-delisted">ST退市</span>'
+          : "") +
         (s.is_new ? '<span class="badge-activity badge-new">新</span>' : "") +
         (s.is_recent ? '<span class="badge-activity badge-recent">改</span>' : "") +
         "</div><div class=\"symbol-meta\">" +
@@ -446,7 +472,9 @@
     bindSchemeSwitch();
     bindToneSwitch();
     updateBanner(payload);
-    renderSymbols(payload.symbols, payload.selectedFile);
+    lastMissingFiles = new Set(payload.missingFiles ?? []);
+    lastSymbols = payload.symbols ?? [];
+    renderSymbols(lastSymbols, payload.selectedFile);
     requestAnimationFrame(() => {
       renderChart(payload.selectedFile, payload.candles?.[payload.selectedFile]);
     });

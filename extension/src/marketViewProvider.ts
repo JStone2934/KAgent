@@ -12,7 +12,9 @@ import {
 import { buildMarketPayload } from "./candleBuilder";
 import { readAllEvents, readSymbols } from "./eventStore";
 import { isCaptureOnSaveEnabled } from "./kagentConfig";
-import { getKagentDir } from "./paths";
+import { getKagentDir, getKagentWorkspaceFolder } from "./paths";
+import { syncDelistedSymbols } from "./symbolDelist";
+import { isFileMissingInWorkspace } from "./workspaceFiles";
 import { syncSnapshotsFromSymbols } from "./snapshotSync";
 import { MarketPayload } from "./types";
 
@@ -23,8 +25,12 @@ export class MarketViewProvider implements vscode.WebviewViewProvider {
   private selectedFile: string | null = null;
   private watchers: vscode.FileSystemWatcher[] = [];
   private refreshTimer?: ReturnType<typeof setTimeout>;
+  private messageDisposable?: vscode.Disposable;
+  private readonly extensionVersion: string;
 
-  constructor(private readonly extensionUri: vscode.Uri) {}
+  constructor(private readonly extensionUri: vscode.Uri) {
+    this.extensionVersion = readExtensionVersion(extensionUri);
+  }
 
   resolveWebviewView(
     webviewView: vscode.WebviewView,
@@ -42,11 +48,12 @@ export class MarketViewProvider implements vscode.WebviewViewProvider {
 
     webviewView.webview.html = this.getHtml(webviewView.webview);
 
-    webviewView.webview.onDidReceiveMessage((msg) => {
+    this.messageDisposable?.dispose();
+    this.messageDisposable = webviewView.webview.onDidReceiveMessage((msg) => {
       if (msg.type === "selectSymbol") {
         this.selectedFile = msg.file ?? null;
-        void this.openSelectedFileInEditor(this.selectedFile);
         void this.pushUpdate();
+        void this.openSelectedFileInEditor(this.selectedFile);
       }
       if (msg.type === "ready") {
         void this.pushUpdate();
@@ -62,10 +69,13 @@ export class MarketViewProvider implements vscode.WebviewViewProvider {
     });
 
     this.setupWatchers();
+    this.setupWorkspaceDeleteWatcher();
     void this.pushUpdate();
   }
 
   disposeWatchers(): void {
+    this.messageDisposable?.dispose();
+    this.messageDisposable = undefined;
     for (const w of this.watchers) {
       w.dispose();
     }
@@ -86,8 +96,8 @@ export class MarketViewProvider implements vscode.WebviewViewProvider {
     if (!relativeFile) {
       return;
     }
-    const folder = vscode.workspace.workspaceFolders?.[0];
-    if (!folder) {
+    const folder = getKagentWorkspaceFolder();
+    if (!folder || (await isFileMissingInWorkspace(folder, relativeFile))) {
       return;
     }
     const uri = vscode.Uri.joinPath(folder.uri, relativeFile);
@@ -97,9 +107,7 @@ export class MarketViewProvider implements vscode.WebviewViewProvider {
         preserveFocus: false,
       });
     } catch {
-      void vscode.window.showWarningMessage(
-        `KAgent: 无法打开文件 ${relativeFile}（可能已删除或不在工作区内）`
-      );
+      /* 已删除或不可读时不打扰用户 */
     }
   }
 
@@ -119,9 +127,9 @@ export class MarketViewProvider implements vscode.WebviewViewProvider {
         clearTimeout(this.refreshTimer);
       }
       this.refreshTimer = setTimeout(() => {
-        const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-        if (root && kagentDir) {
-          syncSnapshotsFromSymbols(kagentDir, root);
+        const folder = getKagentWorkspaceFolder();
+        if (folder && kagentDir) {
+          syncSnapshotsFromSymbols(kagentDir, folder.uri.fsPath);
         }
         void this.pushUpdate();
       }, 150);
@@ -131,12 +139,32 @@ export class MarketViewProvider implements vscode.WebviewViewProvider {
     this.watchers.push(watcher);
   }
 
+  private setupWorkspaceDeleteWatcher(): void {
+    const folder = getKagentWorkspaceFolder();
+    if (!folder) {
+      return;
+    }
+    const pattern = new vscode.RelativePattern(folder, "**/*");
+    const watcher = vscode.workspace.createFileSystemWatcher(pattern);
+    watcher.onDidDelete(() => {
+      if (this.refreshTimer) {
+        clearTimeout(this.refreshTimer);
+      }
+      this.refreshTimer = setTimeout(() => void this.pushUpdate(), 150);
+    });
+    this.watchers.push(watcher);
+  }
+
   private async pushUpdate(): Promise<void> {
     if (!this.view) {
       return;
     }
-    const payload = await this.loadPayload();
-    await this.view.webview.postMessage({ type: "marketUpdate", payload });
+    try {
+      const payload = await this.loadPayload();
+      await this.view.webview.postMessage({ type: "marketUpdate", payload });
+    } catch (err) {
+      console.error("KAgent: 行情刷新失败", err);
+    }
   }
 
   private async loadPayload(): Promise<
@@ -150,13 +178,15 @@ export class MarketViewProvider implements vscode.WebviewViewProvider {
     }
   > {
     const kagentDir = getKagentDir();
-    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const folder = getKagentWorkspaceFolder();
+    const workspaceRoot = folder?.uri.fsPath;
 
     if (!kagentDir) {
       return {
         symbols: [],
         selectedFile: null,
         candles: {},
+        missingFiles: [],
         hooksOk: false,
         captureOnSave: true,
         captureEnabled: true,
@@ -167,12 +197,30 @@ export class MarketViewProvider implements vscode.WebviewViewProvider {
     }
 
     const events = await readAllEvents(kagentDir);
-    const symbolsDoc = readSymbols(kagentDir);
+    let symbolsDoc = readSymbols(kagentDir);
+    if (workspaceRoot != null) {
+      try {
+        symbolsDoc = syncDelistedSymbols(kagentDir, workspaceRoot);
+      } catch {
+        /* 锁冲突时继续用已读 symbols + 下方 VS Code stat 检测 */
+      }
+    }
     const market = buildMarketPayload(
       events,
       symbolsDoc,
-      this.selectedFile
+      this.selectedFile,
+      workspaceRoot ?? undefined
     );
+
+    const missingFiles: string[] = [];
+    if (folder) {
+      for (const s of market.symbols) {
+        if (await isFileMissingInWorkspace(folder, s.file)) {
+          s.is_delisted = true;
+          missingFiles.push(s.file);
+        }
+      }
+    }
 
     const hooksOk = workspaceRoot
       ? fs.existsSync(path.join(workspaceRoot, ".cursor", "hooks.json"))
@@ -181,6 +229,7 @@ export class MarketViewProvider implements vscode.WebviewViewProvider {
 
     return {
       ...market,
+      missingFiles,
       hooksOk,
       captureOnSave,
       captureEnabled: hooksOk || captureOnSave,
@@ -191,6 +240,7 @@ export class MarketViewProvider implements vscode.WebviewViewProvider {
   }
 
   private getHtml(webview: vscode.Webview): string {
+    const v = this.extensionVersion;
     const scriptUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this.extensionUri, "media", "market.js")
     );
@@ -208,9 +258,9 @@ export class MarketViewProvider implements vscode.WebviewViewProvider {
   <meta charset="UTF-8" />
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${csp} 'unsafe-inline'; script-src ${csp} 'unsafe-inline';">
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link rel="stylesheet" href="${styleUri}" />
+  <link rel="stylesheet" href="${styleUri}?v=${v}" />
 </head>
-<body data-color-scheme="cn" data-color-tone="light">
+<body data-color-scheme="cn" data-color-tone="light" data-kagent-version="${v}">
   <div id="banner" class="banner hidden"></div>
   <div class="layout">
     <aside class="sidebar">
@@ -248,9 +298,19 @@ export class MarketViewProvider implements vscode.WebviewViewProvider {
       <div id="chart-container"></div>
     </main>
   </div>
-  <script src="${chartLibUri}"></script>
-  <script src="${scriptUri}"></script>
+  <script src="${chartLibUri}?v=${v}"></script>
+  <script src="${scriptUri}?v=${v}"></script>
 </body>
 </html>`;
+  }
+}
+
+function readExtensionVersion(extensionUri: vscode.Uri): string {
+  try {
+    const pkgPath = path.join(extensionUri.fsPath, "package.json");
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8")) as { version?: string };
+    return pkg.version ?? "0";
+  } catch {
+    return "0";
   }
 }

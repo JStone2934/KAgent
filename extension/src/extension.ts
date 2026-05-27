@@ -3,8 +3,9 @@ import { isMarketColorConfigChange } from "./colorScheme";
 import { MarketViewProvider } from "./marketViewProvider";
 import { hooksConfigured, installProjectHooks } from "./hookInstaller";
 import { isCaptureOnSaveEnabled } from "./kagentConfig";
-import { getKagentDir } from "./paths";
+import { getKagentDir, getKagentWorkspaceFolder } from "./paths";
 import { registerSaveCapture } from "./saveCapture";
+import { syncDelistedSymbols } from "./symbolDelist";
 
 let marketProvider: MarketViewProvider | undefined;
 
@@ -15,7 +16,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.window.registerWebviewViewProvider(
       MarketViewProvider.viewType,
       marketProvider,
-      { webviewOptions: { retainContextWhenHidden: true } }
+      { webviewOptions: { retainContextWhenHidden: false } }
     )
   );
 
@@ -49,8 +50,34 @@ export function activate(context: vscode.ExtensionContext): void {
 
   registerSaveCapture(context);
 
-  const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  const syncDelistAndRefresh = (): void => {
+    const folder = getKagentWorkspaceFolder();
+    const dir = getKagentDir();
+    if (!folder || !dir) {
+      return;
+    }
+    try {
+      syncDelistedSymbols(dir, folder.uri.fsPath);
+    } catch {
+      /* 锁占用时仍依赖 VS Code stat 检测展示退市 */
+    }
+    void marketProvider?.refresh();
+  };
+
+  context.subscriptions.push(
+    vscode.workspace.onDidDeleteFiles(() => syncDelistAndRefresh())
+  );
+
+  const folder = getKagentWorkspaceFolder();
+  const root = folder?.uri.fsPath;
   const kagentDir = getKagentDir();
+  if (root && kagentDir) {
+    try {
+      syncDelistedSymbols(kagentDir, root);
+    } catch {
+      /* ignore */
+    }
+  }
   const onSave = isCaptureOnSaveEnabled(kagentDir);
   const hooks = root ? hooksConfigured(root) : false;
 

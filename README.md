@@ -37,7 +37,7 @@ code --install-extension JStone.kagent
 
 | 方式          | 操作                                                                 |
 | ----------- | ------------------------------------------------------------------ |
-| **命令行（推荐）** | `cursor --install-extension "路径/kagent-0.1.3.vsix"`                |
+| **命令行（推荐）** | `cursor --install-extension "路径/kagent-0.1.5.vsix"`                |
 | **命令面板**    | `Ctrl+Shift+P` → **Extensions: Install from VSIX...** → 选择 `.vsix` |
 | **拖放**      | 将 `.vsix` 拖到 **扩展** 面板（Remote-SSH 等环境可能无效）                         |
 
@@ -67,7 +67,7 @@ Copy-Item -Force node_modules\lightweight-charts\dist\lightweight-charts.standal
 
 **开发调试（改扩展代码时）**
 
-用 Cursor / VS Code 打开 `extension` 目录 → **F5**（Run Extension）→ 在 Extension Development Host 中打开**仓库根目录**（不是只开 `extension` 子文件夹）。
+用 Cursor / VS Code 打开**仓库根目录** → **F5**（Run KAgent Extension）→ 在 Extension Development Host 中同样打开**仓库根目录**。根目录已提供 `.vscode/launch.json`；若只打开 `extension` 子文件夹，请用其内的 `extension/.vscode/launch.json`。
 
 
 
@@ -100,11 +100,12 @@ Copy-Item -Force node_modules\lightweight-charts\dist\lightweight-charts.standal
 | `KAgent: 刷新行情`    | 视图标题栏刷新       |
 
 
-- **左侧列表**：每个被 Agent 改过的文件 = 一支股票；**▲/▼** = 相对上一根 K 线的涨跌  
-- **右侧图表**：选中文件的 K 线；点列表项在编辑器打开该文件  
+- **左侧列表**：每个被跟踪的文件 = 一支股票；**▲/▼** = 相对上一根 K 线的涨跌；**新** / **改** = 刚上市或刚编辑  
+- **右侧图表**：选中文件的 K 线；点列表项在编辑器打开该文件（已删除的不会弹错）  
 - **右上角**：切换 **A 股 / 美股**、**亮 / 暗**（或设置 `kagent.colorScheme`、`kagent.colorTone`）
+- **ST 退市**：在资源管理器中**手动删除**已跟踪文件后，列表项变灰并标 **ST退市**；再点 **刷新行情** 约 3 次后从列表移除（历史 K 线仍保留在 `events.ndjson`）
 
-Agent 每改一个新文件，列表里会多一支「新上市」的股票。
+Agent 每改一个新文件，列表里会多一支「新上市」的股票。保存文件时若开启 `kagent.capture.onSave`，手动保存也会记一根 K 线。
 
 ---
 
@@ -116,14 +117,15 @@ Agent 每改一个新文件，列表里会多一支「新上市」的股票。
 | 现实世界   | KAgent                          |
 | ------ | ------------------------------- |
 | 一支股票   | 工作区里的 **一个文件**                  |
-| 上市     | Agent **第一次**修改该文件              |
-| 一根 K 线 | Agent **一轮**编辑（行数开高低收 + 成交量）    |
+| 上市     | **第一次**被记录到该文件（Agent 或保存采集）   |
+| 一根 K 线 | **一轮**编辑（行数开高低收 + 成交量）         |
+| ST 退市  | **手动删除**已跟踪的源文件；灰色显示，多轮刷新后下市 |
 | 红 / 绿  | **行数**变多或变少（A 股红涨绿跌 / 美股相反，可切换） |
 
 
 **能做什么**
 
-- **自动采集**：[Cursor Hooks](https://cursor.com/docs/hooks) `afterFileEdit` → 写入 `.kagent/`
+- **自动采集**：[Cursor Hooks](https://cursor.com/docs/hooks) `afterFileEdit`；可选 **保存时采集**（`kagent.capture.onSave`）→ 写入 `.kagent/`
 - **侧边栏行情**：文件列表 + K 线 + 成交量，**离线**内置图表，无需联网
 - **细粒度 K 线**：同轮既有删又有增会拆成两根；行数不变但内容被改写也会记入（语义波动）
 
@@ -149,7 +151,8 @@ node scripts/simulate-edit.mjs demo/sample.txt 1
 | ------------------- | --------------------------------------------------------------------------------------------------------- |
 | Cursor 里搜不到 KAgent  | Cursor 不走 Open VSX，请用 [VSIX](#从-vsix-安装) 或 [Releases](https://github.com/JStone2934/KAgent/releases) |
 | 扩展面板没有「从 VSIX 安装」菜单 | 用 **命令面板** 或 **`cursor --install-extension`** |
-| 侧边栏一直是空的            | 确认已 **安装 Hooks**、工作区 **Trusted**、且 Agent **改过文件**（或跑模拟脚本）                                                 |
+| 侧边栏一直是空的            | 确认已 **安装 Hooks** 或开启 **保存采集**、工作区 **Trusted**、且 **改过/保存过文件**（或跑模拟脚本）                              |
+| 删文件后没有 ST 退市        | 安装 **≥ 0.1.5** 并 Reload Window；在行情视图点 **刷新行情**；仅对已出现在列表中的文件生效                                      |
 | Hooks 不触发           | 必须打开**仓库根目录**；检查 `.cursor/hooks.json` 是否存在                                                                |
 | `cursor` 命令找不到      | 在 Cursor 中安装 Shell 命令到 PATH，重启终端                                                                          |
 
@@ -174,7 +177,7 @@ flowchart LR
 | 路径                      | 作用                          |
 | ----------------------- | --------------------------- |
 | `.kagent/events.ndjson` | 每次编辑一条事件（NDJSON）            |
-| `.kagent/symbols.json`  | 已「上市」文件列表                   |
+| `.kagent/symbols.json`  | 已「上市」文件列表（含 `delisted` / `delist_rounds` 退市状态） |
 | `.kagent/config.json`   | 忽略路径（默认排除 `node_modules` 等） |
 
 

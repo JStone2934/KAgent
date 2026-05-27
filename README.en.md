@@ -32,7 +32,7 @@ code --install-extension JStone.kagent
 
 | Method | Steps |
 |--------|--------|
-| **CLI (recommended)** | `cursor --install-extension "/path/to/kagent-0.1.3.vsix"` |
+| **CLI (recommended)** | `cursor --install-extension "/path/to/kagent-0.1.5.vsix"` |
 | **Command Palette** | `Ctrl+Shift+P` → **Extensions: Install from VSIX...** → pick `.vsix` |
 | **Drag & drop** | Drop `.vsix` onto the **Extensions** view (may not work over Remote-SSH) |
 
@@ -59,7 +59,7 @@ Copy-Item -Force node_modules\lightweight-charts\dist\lightweight-charts.standal
 
 **Extension development**
 
-Open the `extension` folder in Cursor / VS Code → **F5** (Run Extension) → in the Extension Development Host, open the **repository root** (not only the `extension` subfolder).
+Open the **repository root** in Cursor / VS Code → **F5** (Run KAgent Extension) → in the Extension Development Host, open the **repository root** again. Root `.vscode/launch.json` is provided; if you only open the `extension` subfolder, use `extension/.vscode/launch.json`.
 
 ---
 
@@ -88,11 +88,12 @@ This repo already includes sample hooks — **clone and skip** if you only use K
 | `KAgent: 打开行情图` | Same view |
 | `KAgent: 刷新行情` | Refresh from the view title bar |
 
-- **Left list**: each file touched by the Agent = one ticker; **▲/▼** = move vs. the previous candle
-- **Right chart**: candles for the selected file; click a row to open the file in the editor
+- **Left list**: each tracked file = one ticker; **▲/▼** = move vs. the previous candle; **新 / 改** badges for recent IPO or edit
+- **Right chart**: candles for the selected file; click a row to open the file (deleted files won’t show an error toast)
 - **Top-right**: **CN / US** color scheme and **light / dark** tone (`kagent.colorScheme`, `kagent.colorTone`)
+- **ST delisted**: after you **manually delete** a tracked file, the row turns gray with an **ST退市** badge; after about **3** **Refresh market** clicks it leaves the list (history remains in `events.ndjson`)
 
-Each newly edited file appears as a newly “listed” ticker.
+Each newly edited file appears as a newly “listed” ticker. With `kagent.capture.onSave` enabled, manual saves also record a candle.
 
 ---
 
@@ -101,13 +102,14 @@ Each newly edited file appears as a newly “listed” ticker.
 | Real world | KAgent |
 |------------|--------|
 | A stock | **One file** in the workspace |
-| IPO | Agent’s **first** edit to that file |
+| IPO | **First** recorded change to that file (Agent or save capture) |
 | One candle | **One round** of edits (OHLC by line count + volume) |
+| ST delisted | **Manually deleted** tracked file; gray row, removed from list after several refreshes |
 | Red / green | **Line count** up or down (CN: red up; US: green up — switchable) |
 
 **Features**
 
-- **Capture**: [Cursor Hooks](https://cursor.com/docs/hooks) `afterFileEdit` → `.kagent/`
+- **Capture**: [Cursor Hooks](https://cursor.com/docs/hooks) `afterFileEdit`; optional **on save** (`kagent.capture.onSave`) → `.kagent/`
 - **Sidebar market**: list + candles + volume; **offline** bundled chart, no network required
 - **Fine-grained candles**: mixed delete/add in one round splits into two candles; same line count with rewritten content is tracked (semantic volatility)
 
@@ -132,7 +134,8 @@ Open the KAgent sidebar and select `demo/sample.txt`. Full walkthrough: [demo/wa
 |-------|-----|
 | Can’t find KAgent in Cursor | Cursor doesn’t use Open VSX — use [VSIX](#install-from-vsix) or [Releases](https://github.com/JStone2934/KAgent/releases) |
 | No “Install from VSIX” in Extensions UI | Use the **command palette** or **`cursor --install-extension`** |
-| Sidebar always empty | Install **hooks**, set workspace **Trusted**, ensure the Agent **edited files** (or run the demo script) |
+| Sidebar always empty | Install **hooks** or enable **save capture**, set workspace **Trusted**, **edit/save files** (or run the demo script) |
+| No ST delisted after delete | Use **≥ 0.1.5**, Reload Window, click **Refresh market**; only files already in the list |
 | Hooks never fire | Open the **repo root**; verify `.cursor/hooks.json` exists |
 | `cursor` command not found | Install shell command to PATH from Cursor, restart terminal |
 
@@ -153,7 +156,7 @@ flowchart LR
 | Path | Role |
 |------|------|
 | `.kagent/events.ndjson` | One event per edit (NDJSON) |
-| `.kagent/symbols.json` | “Listed” files |
+| `.kagent/symbols.json` | “Listed” files (`delisted`, `delist_rounds` for ST delisted state) |
 | `.kagent/config.json` | Ignore paths (e.g. `node_modules`) |
 
 **Candle fields (advanced)**

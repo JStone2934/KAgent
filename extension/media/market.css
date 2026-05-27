@@ -164,6 +164,25 @@ body {
   border-left-color: var(--kagent-up);
 }
 
+.symbol-list li.delisted {
+  opacity: 0.55;
+  border-left-color: var(--vscode-descriptionForeground);
+}
+
+.symbol-list li.delisted .symbol-name,
+.symbol-list li.delisted .symbol-meta,
+.symbol-list li.delisted .trend-arrow {
+  color: var(--vscode-descriptionForeground);
+}
+
+.symbol-list li.delisted:hover {
+  background: var(--vscode-list-inactiveSelectionBackground);
+}
+
+.symbol-list li.delisted.active {
+  opacity: 0.7;
+}
+
 .symbol-name {
   font-size: 11px;
   word-break: break-all;
@@ -182,6 +201,12 @@ body {
   color: #fff;
   border-radius: 2px;
   vertical-align: 1px;
+}
+
+.badge-delisted {
+  background: var(--vscode-descriptionForeground);
+  color: var(--vscode-editor-background);
+  font-weight: 600;
 }
 
 .empty-hint {

@@ -31,6 +31,8 @@ export interface SymbolInfo {
   last_lines: number;
   last_ts: number;
   delisted?: boolean;
+  /** 退市后经历的刷新轮次，满阈值后从 symbols 移除 */
+  delist_rounds?: number;
   last_source?: string;
   last_content_hash?: string;
 }
@@ -72,10 +74,14 @@ export interface SymbolSummary {
   is_new?: boolean;
   /** 刚刚发生过编辑（与 last_ts 间隔在窗口内，且非 is_new） */
   is_recent?: boolean;
+  /** 源文件已从工作区删除，展示为 ST 退市 */
+  is_delisted?: boolean;
 }
 
 export interface MarketPayload {
   symbols: SymbolSummary[];
   selectedFile: string | null;
   candles: Record<string, Candle[]>;
+  /** 工作区中已不存在的跟踪文件（冗余字段，供 Webview 兜底） */
+  missingFiles?: string[];
 }

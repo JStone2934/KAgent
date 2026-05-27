@@ -6,6 +6,7 @@ import {
   SymbolSummary,
   SymbolsFile,
 } from "./types";
+import { isWorkspaceFileMissing } from "./symbolDelist";
 
 /** 列表「新」「改」标记的有效时间（毫秒） */
 const ACTIVITY_WINDOW_MS = 60_000;
@@ -125,6 +126,7 @@ export function buildMarketPayload(
   events: KagentEvent[],
   symbolsDoc: SymbolsFile,
   selectedFile: string | null,
+  workspaceRoot?: string,
   now = Date.now()
 ): MarketPayload {
   const candles: Record<string, Candle[]> = {};
@@ -156,9 +158,21 @@ export function buildMarketPayload(
         is_recent:
           now - (info?.last_ts ?? ipo_ts) < ACTIVITY_WINDOW_MS &&
           now - ipo_ts >= ACTIVITY_WINDOW_MS,
+        is_delisted:
+          info?.delisted === true ||
+          (workspaceRoot != null &&
+            isWorkspaceFileMissing(workspaceRoot, file) &&
+            (info != null || events.some((ev) => ev.file === file))),
       };
     })
-    .sort((a, b) => b.last_ts - a.last_ts);
+    .sort((a, b) => {
+      const ad = a.is_delisted ? 1 : 0;
+      const bd = b.is_delisted ? 1 : 0;
+      if (ad !== bd) {
+        return ad - bd;
+      }
+      return b.last_ts - a.last_ts;
+    });
 
   const active =
     selectedFile && files.has(selectedFile)
