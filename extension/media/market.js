@@ -38,12 +38,17 @@
   const metaByTime = new Map();
   let lastCandles = [];
   let lastSelectedFile = null;
+  let lastRenderedFile = null;
   let lastSymbols = [];
   let lastMissingFiles = new Set();
+  const candlesByFile = new Map();
   let colorScheme = "cn";
   let colorTone = "light";
   let schemeSwitchBound = false;
   let toneSwitchBound = false;
+  let symbolListBound = false;
+  let userAdjustedViewport = false;
+  let suppressViewportChange = false;
 
   const SCHEME_LEGEND = { cn: "红涨绿跌", us: "绿涨红跌" };
 
@@ -79,8 +84,11 @@
   }
 
   function applyMarketColors(scheme, tone) {
-    colorScheme = scheme === "us" ? "us" : "cn";
-    colorTone = tone === "dark" ? "dark" : "light";
+    const nextScheme = scheme === "us" ? "us" : "cn";
+    const nextTone = tone === "dark" ? "dark" : "light";
+    const changed = nextScheme !== colorScheme || nextTone !== colorTone;
+    colorScheme = nextScheme;
+    colorTone = nextTone;
     document.documentElement.dataset.colorScheme = colorScheme;
     document.documentElement.dataset.colorTone = colorTone;
     document.body.dataset.colorScheme = colorScheme;
@@ -94,8 +102,8 @@
     if (els.chartLegend) {
       els.chartLegend.textContent = legendText();
     }
-    if (candleSeries && lastCandles.length && lastSelectedFile) {
-      renderChart(lastSelectedFile, lastCandles);
+    if (changed && candleSeries && lastCandles.length && lastRenderedFile) {
+      renderChart(lastRenderedFile, lastCandles, { preserveViewport: true });
     } else if (candleSeries) {
       candleSeries.applyOptions(candlestickSeriesOptions(getKagentColors()));
     }
@@ -131,6 +139,62 @@
         vscode.postMessage({ type: "setColorTone", tone: next });
       });
     });
+  }
+
+  function bindSymbolList() {
+    if (symbolListBound || !els.symbolList) {
+      return;
+    }
+    symbolListBound = true;
+
+    const eventName = window.PointerEvent ? "pointerdown" : "click";
+    els.symbolList.addEventListener(eventName, (event) => {
+      if (eventName === "pointerdown" && event.button !== 0) {
+        return;
+      }
+      const item = symbolItemFromEvent(event);
+      const file = item?.dataset?.file;
+      if (!file) {
+        return;
+      }
+      event.preventDefault();
+      selectSymbol(file);
+    });
+
+    els.symbolList.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") {
+        return;
+      }
+      const item = symbolItemFromEvent(event);
+      const file = item?.dataset?.file;
+      if (!file) {
+        return;
+      }
+      event.preventDefault();
+      selectSymbol(file);
+    });
+  }
+
+  function symbolItemFromEvent(event) {
+    const target = event.target;
+    const element =
+      target instanceof Element ? target : target?.parentElement ?? null;
+    return element?.closest?.(".symbol-item") ?? null;
+  }
+
+  function selectSymbol(file) {
+    lastSelectedFile = file;
+    renderSymbols(lastSymbols, file);
+
+    const cachedCandles = candlesByFile.get(file);
+    if (cachedCandles) {
+      renderChart(file, cachedCandles);
+    } else {
+      els.chartTitle.textContent = file + "（加载中…）";
+      updateOhlcBar(null);
+    }
+
+    vscode.postMessage({ type: "selectSymbol", file });
   }
 
   function showChartError(msg) {
@@ -304,12 +368,30 @@
       }
     });
 
+    chart.timeScale().subscribeVisibleLogicalRangeChange(() => {
+      if (!suppressViewportChange) {
+        userAdjustedViewport = true;
+      }
+    });
+
     new ResizeObserver(() => resizeChart()).observe(els.chartContainer);
     return true;
   }
 
-  function renderChart(file, candles) {
+  function withSuppressedViewportChange(fn) {
+    suppressViewportChange = true;
+    try {
+      fn();
+    } finally {
+      requestAnimationFrame(() => {
+        suppressViewportChange = false;
+      });
+    }
+  }
+
+  function renderChart(file, candles, options = {}) {
     lastCandles = candles ?? [];
+    const previousFile = lastRenderedFile;
     const delisted =
       file &&
       normalizeSymbols(lastSymbols).some(
@@ -327,6 +409,7 @@
         volumeSeries?.setData([]);
       }
       updateOhlcBar(null);
+      lastRenderedFile = file ?? null;
       return;
     }
 
@@ -348,10 +431,28 @@
       };
     });
 
+    const sameFile = file === previousFile;
+    const previousRange = sameFile
+      ? chart.timeScale().getVisibleLogicalRange()
+      : null;
+
     candleSeries.setData(series);
     volumeSeries.setData(vol);
-    chart.timeScale().fitContent();
-    resizeChart();
+    withSuppressedViewportChange(() => {
+      if (
+        (options.preserveViewport || (sameFile && userAdjustedViewport)) &&
+        previousRange
+      ) {
+        chart.timeScale().setVisibleLogicalRange(previousRange);
+      } else {
+        chart.timeScale().fitContent();
+      }
+      resizeChart();
+    });
+    lastRenderedFile = file;
+    if (!sameFile) {
+      userAdjustedViewport = false;
+    }
 
     const last = series[series.length - 1];
     updateOhlcBar(metaByTime.get(last.time));
@@ -390,6 +491,8 @@
     for (const s of list) {
       const li = document.createElement("li");
       li.className = "symbol-item";
+      li.dataset.file = s.file;
+      li.tabIndex = 0;
       if (s.file === activeFile) {
         li.classList.add("active");
       }
@@ -417,9 +520,6 @@
         " 行 · 净" +
         formatNet(s.total_net) +
         "</div></div>";
-      li.addEventListener("click", () => {
-        vscode.postMessage({ type: "selectSymbol", file: s.file });
-      });
       els.symbolList.appendChild(li);
     }
   }
@@ -468,20 +568,30 @@
     }
     const payload = event.data.payload;
     lastSelectedFile = payload.selectedFile ?? null;
+    Object.entries(payload.candles ?? {}).forEach(([file, candles]) => {
+      candlesByFile.set(file, candles ?? []);
+    });
     applyMarketColors(payload.colorScheme, payload.colorTone);
     bindSchemeSwitch();
     bindToneSwitch();
+    bindSymbolList();
     updateBanner(payload);
     lastMissingFiles = new Set(payload.missingFiles ?? []);
     lastSymbols = payload.symbols ?? [];
     renderSymbols(lastSymbols, payload.selectedFile);
+    const selectedFile = payload.selectedFile;
+    const selectedCandles =
+      payload.candles?.[selectedFile] ?? candlesByFile.get(selectedFile);
     requestAnimationFrame(() => {
-      renderChart(payload.selectedFile, payload.candles?.[payload.selectedFile]);
+      if (selectedFile === lastSelectedFile) {
+        renderChart(selectedFile, selectedCandles);
+      }
     });
   });
 
   bindSchemeSwitch();
   bindToneSwitch();
+  bindSymbolList();
   applyMarketColors(
     document.body.dataset.colorScheme || "cn",
     document.body.dataset.colorTone || "light"
