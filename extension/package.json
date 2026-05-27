@@ -1,13 +1,34 @@
 {
   "name": "kagent",
+  "icon": "icon.png",
   "displayName": "KAgent",
-  "description": "将 Agent 文件修改以股票 K 线图展示（一文件一股）",
+  "description": "将 Cursor Agent 文件修改以股票 K 线图展示（一文件一股）",
   "version": "0.1.2",
   "publisher": "kagent",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/JStone2934/KAgent.git"
+  },
+  "bugs": {
+    "url": "https://github.com/JStone2934/KAgent/issues"
+  },
+  "homepage": "https://github.com/JStone2934/KAgent#readme",
+  "keywords": [
+    "cursor",
+    "agent",
+    "k-line",
+    "visualization",
+    "hooks"
+  ],
   "engines": {
     "vscode": "^1.85.0"
   },
   "categories": ["Other", "Visualization"],
+  "galleryBanner": {
+    "color": "#1e1e2e",
+    "theme": "dark"
+  },
   "activationEvents": ["onStartupFinished"],
   "main": "./out/extension.js",
   "contributes": {
