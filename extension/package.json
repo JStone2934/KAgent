@@ -3,7 +3,7 @@
   "icon": "icon.png",
   "displayName": "KAgent",
   "description": "将 Cursor Agent 文件修改以股票 K 线图展示（一文件一股）",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "publisher": "JStone",
   "license": "MIT",
   "repository": {
