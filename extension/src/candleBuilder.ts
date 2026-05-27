@@ -130,10 +130,17 @@ export function buildMarketPayload(
   now = Date.now()
 ): MarketPayload {
   const candles: Record<string, Candle[]> = {};
-  const files = new Set<string>([
-    ...Object.keys(symbolsDoc.symbols),
-    ...events.map((e) => e.file),
-  ]);
+  const symbolFiles = new Set(Object.keys(symbolsDoc.symbols));
+  const files = new Set<string>(symbolFiles);
+  for (const e of events) {
+    if (
+      symbolFiles.has(e.file) ||
+      workspaceRoot == null ||
+      !isWorkspaceFileMissing(workspaceRoot, e.file)
+    ) {
+      files.add(e.file);
+    }
+  }
 
   const netByFile = new Map<string, number>();
   for (const e of events) {
