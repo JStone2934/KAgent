@@ -4,11 +4,12 @@ on:
   workflow_dispatch:
     inputs:
       version_bump:
-        description: Semver bump (only for manual release)
+        description: Semver bump, or publish current package version
         required: true
         default: patch
         type: choice
         options:
+          - current
           - patch
           - minor
           - major
@@ -45,10 +46,12 @@ jobs:
           cache: npm
           cache-dependency-path: extension/package-lock.json
 
-      - name: Bump version
+      - name: Resolve version
         id: meta
         run: |
-          npm version ${{ inputs.version_bump }} --no-git-tag-version
+          if [ "${{ inputs.version_bump }}" != "current" ]; then
+            npm version ${{ inputs.version_bump }} --no-git-tag-version
+          fi
           VERSION=$(node -p "require('./package.json').version")
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
@@ -81,6 +84,7 @@ jobs:
         run: npx ovsx publish --no-dependencies -p "$OVSX_PAT"
 
       - name: Commit version bump and push tag
+        if: inputs.version_bump != 'current'
         working-directory: ${{ github.workspace }}
         env:
           VERSION: ${{ steps.meta.outputs.version }}
@@ -95,6 +99,7 @@ jobs:
           git push origin "${TAG}"
 
       - name: Create GitHub Release
+        if: inputs.version_bump != 'current'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.meta.outputs.tag }}
