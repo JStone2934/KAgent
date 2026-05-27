@@ -1,3 +1,6 @@
+export type KagentEventSource = "afterFileEdit" | "onSave" | "simulate" | string;
+export type KagentEventActor = "agent" | "human" | "unknown";
+
 export interface KagentEvent {
   v: number;
   ts: number;
@@ -15,7 +18,11 @@ export interface KagentEvent {
   lines_low?: number;
   is_ipo: boolean;
   edit_index: number;
-  source: string;
+  source: KagentEventSource;
+  actor?: KagentEventActor;
+  editor?: string;
+  save_reason?: string;
+  content_hash_after?: string;
 }
 
 export interface SymbolInfo {
@@ -24,6 +31,8 @@ export interface SymbolInfo {
   last_lines: number;
   last_ts: number;
   delisted?: boolean;
+  last_source?: string;
+  last_content_hash?: string;
 }
 
 export interface SymbolsFile {

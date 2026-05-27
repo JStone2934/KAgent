@@ -1,7 +1,10 @@
 import * as vscode from "vscode";
 import { isMarketColorConfigChange } from "./colorScheme";
 import { MarketViewProvider } from "./marketViewProvider";
-import { installProjectHooks, hooksConfigured } from "./hookInstaller";
+import { hooksConfigured, installProjectHooks } from "./hookInstaller";
+import { isCaptureOnSaveEnabled } from "./kagentConfig";
+import { getKagentDir } from "./paths";
+import { registerSaveCapture } from "./saveCapture";
 
 let marketProvider: MarketViewProvider | undefined;
 
@@ -44,11 +47,28 @@ export function activate(context: vscode.ExtensionContext): void {
     })
   );
 
+  registerSaveCapture(context);
+
   const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-  if (root && !hooksConfigured(root)) {
+  const kagentDir = getKagentDir();
+  const onSave = isCaptureOnSaveEnabled(kagentDir);
+  const hooks = root ? hooksConfigured(root) : false;
+
+  if (root && onSave && !hooks) {
     void vscode.window
       .showInformationMessage(
-        "KAgent: 尚未配置项目 Hooks，Agent 修改将无法记录行情。",
+        "KAgent: 已记录保存时的手动编辑。安装 Hooks 可同时记录 Agent 修改。",
+        "安装 Hooks"
+      )
+      .then((choice) => {
+        if (choice === "安装 Hooks") {
+          void installProjectHooks(context.extensionUri);
+        }
+      });
+  } else if (root && !onSave && !hooks) {
+    void vscode.window
+      .showInformationMessage(
+        "KAgent: 保存采集已关闭，且未配置 Hooks。请在设置中开启 kagent.capture.onSave 或安装 Hooks。",
         "安装 Hooks"
       )
       .then((choice) => {

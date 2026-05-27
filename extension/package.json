@@ -2,7 +2,7 @@
   "name": "kagent",
   "icon": "icon.png",
   "displayName": "KAgent",
-  "description": "将 Cursor Agent 文件修改以股票 K 线图展示（一文件一股）",
+  "description": "将文件保存与 Agent 修改以股票 K 线图展示（一文件一股）",
   "version": "0.1.4",
   "publisher": "JStone",
   "license": "MIT",
@@ -107,6 +107,11 @@
           ],
           "default": "light",
           "description": "涨跌颜色的明暗风格，与 colorScheme 组合使用"
+        },
+        "kagent.capture.onSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "在每次保存（含自动保存）时记录一根 K 线"
         }
       }
     }

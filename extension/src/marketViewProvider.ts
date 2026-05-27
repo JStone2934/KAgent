@@ -11,7 +11,9 @@ import {
 } from "./colorScheme";
 import { buildMarketPayload } from "./candleBuilder";
 import { readAllEvents, readSymbols } from "./eventStore";
+import { isCaptureOnSaveEnabled } from "./kagentConfig";
 import { getKagentDir } from "./paths";
+import { syncSnapshotsFromSymbols } from "./snapshotSync";
 import { MarketPayload } from "./types";
 
 export class MarketViewProvider implements vscode.WebviewViewProvider {
@@ -116,7 +118,13 @@ export class MarketViewProvider implements vscode.WebviewViewProvider {
       if (this.refreshTimer) {
         clearTimeout(this.refreshTimer);
       }
-      this.refreshTimer = setTimeout(() => void this.pushUpdate(), 150);
+      this.refreshTimer = setTimeout(() => {
+        const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        if (root && kagentDir) {
+          syncSnapshotsFromSymbols(kagentDir, root);
+        }
+        void this.pushUpdate();
+      }, 150);
     };
     watcher.onDidChange(schedule);
     watcher.onDidCreate(schedule);
@@ -134,6 +142,8 @@ export class MarketViewProvider implements vscode.WebviewViewProvider {
   private async loadPayload(): Promise<
     MarketPayload & {
       hooksOk: boolean;
+      captureOnSave: boolean;
+      captureEnabled: boolean;
       kagentDir: string | null;
       colorScheme: ColorScheme;
       colorTone: ColorTone;
@@ -148,6 +158,8 @@ export class MarketViewProvider implements vscode.WebviewViewProvider {
         selectedFile: null,
         candles: {},
         hooksOk: false,
+        captureOnSave: true,
+        captureEnabled: true,
         kagentDir: null,
         colorScheme: getColorScheme(),
         colorTone: getColorTone(),
@@ -165,10 +177,13 @@ export class MarketViewProvider implements vscode.WebviewViewProvider {
     const hooksOk = workspaceRoot
       ? fs.existsSync(path.join(workspaceRoot, ".cursor", "hooks.json"))
       : false;
+    const captureOnSave = isCaptureOnSaveEnabled(kagentDir);
 
     return {
       ...market,
       hooksOk,
+      captureOnSave,
+      captureEnabled: hooksOk || captureOnSave,
       kagentDir,
       colorScheme: getColorScheme(),
       colorTone: getColorTone(),
@@ -204,7 +219,7 @@ export class MarketViewProvider implements vscode.WebviewViewProvider {
         <span id="symbol-count" class="muted">0</span>
       </div>
       <ul id="symbol-list" class="symbol-list"></ul>
-      <p id="empty-hint" class="empty-hint">暂无股票。Agent 修改文件后会出现。</p>
+      <p id="empty-hint" class="empty-hint">暂无股票。保存文件或 Agent 修改后会出现。</p>
     </aside>
     <main class="chart-panel">
       <div class="chart-header">

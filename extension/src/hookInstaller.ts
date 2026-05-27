@@ -28,15 +28,21 @@ export async function installProjectHooks(
   const hooksDir = path.join(cursorDir, "hooks");
   const hooksJsonPath = path.join(cursorDir, "hooks.json");
   const captureDest = path.join(hooksDir, "kagent-capture.mjs");
+  const recordDest = path.join(hooksDir, "kagent-record.mjs");
   const captureSrc = path.join(
     extensionUri.fsPath,
     "resources",
     "kagent-capture.mjs"
   );
+  const recordSrc = path.join(
+    extensionUri.fsPath,
+    "resources",
+    "kagent-record.mjs"
+  );
 
   fs.mkdirSync(hooksDir, { recursive: true });
 
-  if (!fs.existsSync(captureSrc)) {
+  if (!fs.existsSync(captureSrc) || !fs.existsSync(recordSrc)) {
     vscode.window.showErrorMessage(
       "KAgent: 找不到内置 hook 脚本，请重新安装扩展。"
     );
@@ -44,7 +50,9 @@ export async function installProjectHooks(
   }
 
   fs.copyFileSync(captureSrc, captureDest);
+  fs.copyFileSync(recordSrc, recordDest);
   fs.chmodSync(captureDest, 0o755);
+  fs.chmodSync(recordDest, 0o755);
 
   if (fs.existsSync(hooksJsonPath)) {
     const merge = await vscode.window.showWarningMessage(
@@ -76,6 +84,11 @@ export async function installProjectHooks(
             "**/dist/**",
             "**/out/**",
           ],
+          capture: {
+            onSave: true,
+            agentHook: true,
+            coalesceWindowMs: 1500,
+          },
         },
         null,
         2
@@ -95,7 +108,7 @@ export async function installProjectHooks(
   }
 
   vscode.window.showInformationMessage(
-    "KAgent: 项目 Hooks 已安装。请在受信任工作区中使用 Agent 修改文件以产生行情。"
+    "KAgent: 项目 Hooks 已安装。保存文件或 Agent 修改均可产生行情。"
   );
 }
 
