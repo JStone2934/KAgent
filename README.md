@@ -4,6 +4,7 @@
 
 **把 Cursor Agent 的每次改文件，画成一支「股票」的 K 线**  
 一个文件 = 一支股票 · 首次被改 = 上市 · 每次编辑 = 一根 K 线
+<img width="3840" height="2100" alt="ab9d09abf99c47e67d3f31e075483c59" src="https://github.com/user-attachments/assets/6e2aea95-c8a2-4db9-820d-59e7608b2728" />
 
 
 
