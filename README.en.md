@@ -2,7 +2,7 @@
 
 [中文](README.md) · [English](README.en.md)
 
-**Turn every Cursor Agent file edit into a stock-style candlestick chart**  
+**Turn every Agent file edit into a stock-style candlestick chart**  
 One file = one ticker · First edit = IPO · Each edit round = one candle
 <img width="3840" height="2100" alt="ab9d09abf99c47e67d3f31e075483c59" src="https://github.com/user-attachments/assets/bb6ad536-dbe3-4b6a-a077-55aea1e68bb2" />
 
