@@ -17,6 +17,7 @@
 ### ① 安装扩展
 
 # 直接在商店下载
+<img width="881" height="427" alt="image" src="https://github.com/user-attachments/assets/efda6848-25bd-4804-a04d-c621703fa8a5" />
 
 或者任选一种方式：
 
